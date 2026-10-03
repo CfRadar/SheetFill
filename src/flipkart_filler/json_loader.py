@@ -64,7 +64,14 @@ def sanitize_json_text(text: str) -> str:
     # 2. Normalize smart quotes
     text = text.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
 
-    # 3. Repair key_features: \( ... \) or ( ... )
+    # 3. Repair array parentheses: any "key": \( ... \) or ( ... ) -> "key": [ ... ]
+    # Handles key_features, detail_placement_rows, sizes, or any array formatted with parentheses
+    text = re.sub(
+        r'("[a-zA-Z0-9_]+"\s*:\s*)\\?\(\s*(.*?)\s*\\?\)(?=\s*[,}\]])',
+        r"\1[\2]",
+        text,
+        flags=re.DOTALL,
+    )
     text = re.sub(
         r'("key_features"\s*:\s*)\\?\(\s*(.*?)\s*\\?\)',
         r"\1[\2]",

@@ -32,6 +32,7 @@ from app.services.sheet_reader import read_tshirt_sheet
 from app.services.writer import rebuild_tshirt_workbook
 from flipkart_filler.allowed_values import load_allowed_values
 from flipkart_filler.json_loader import JSONLoadError, parse_single_json_content, sanitize_json_text
+from flipkart_filler.models import ValidationIssue
 
 router = APIRouter(prefix="/api")
 store = DesignStore()
