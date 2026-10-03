@@ -1,0 +1,28 @@
+sizes: [S, M, L, XL]
+group_id: "group 1"
+hsn_mode: sku            # sku | fixed
+hsn_fixed: ""            # e.g. "6109" if you choose fixed (verify with your accountant)
+listing_status: Active
+mrp: 1999
+selling_price: 749
+fulfilment_by: Seller
+procurement_type: instock
+procurement_sla_days: 2
+stock: 2000
+shipping_provider: Flipkart
+handling_fees: {local: 0, zonal: 0, national: 0}
+package_cm: {length: 25, breadth: 20, height: 3}
+weight_kg: 0.222
+luxury_cess: 0
+country_of_origin: India
+manufacturer: "fashion continental"
+brand: "fashion continental"
+tax_code: GST_APPAREL
+pack_of: 1
+suitable_for: "Western Wear"
+detail_placement: "Front Panel"
+print_coverage: Chest
+tee_length: Medium
+reversible: "No"
+sleeve_details: "No Details"
+ideal_for_unisex_default: Women     # used for "Men and Women" / "Unisex"

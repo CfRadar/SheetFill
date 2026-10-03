@@ -1,0 +1,56 @@
+sleeve:
+  "short sleeve": "Half Sleeve"
+  "short sleeves": "Half Sleeve"
+  "half sleeve": "Half Sleeve"
+  "full sleeve": "Full Sleeve"
+  "long sleeve": "Full Sleeve"
+  "3/4 sleeve": "3/4 Sleeve"
+  "sleeveless": "Sleeveless"
+
+ideal_for:
+  "men": "Men"
+  "women": "Women"
+  "men and women": "<ideal_for_unisex_default>"
+  "unisex": "<ideal_for_unisex_default>"
+  "couple": "Couple"
+
+color:
+  "cream": "Beige"
+  "off-white": "Beige"
+  "off white": "Beige"
+  "ivory": "Beige"
+  "offwhite": "Beige"
+  "navy": "Navy Blue"
+  "maroon": "Maroon"
+  "multi": "Multicolor"
+
+fabric:
+  "cotton blend": "Cotton Blend"
+  "100% cotton": "Pure Cotton"
+  "cotton": "Pure Cotton"
+  "polyester": "Polyester"
+
+pattern:
+  "graphic print": "Graphic Print"
+  "printed": "Printed"
+  "solid": "Solid"
+  "typography": "Typography"
+
+neck:
+  "round neck": "Round Neck"
+  "crew neck": "Crew Neck"
+  "v neck": "V Neck"
+  "polo": "Polo Neck"
+
+fit:
+  "oversized": "Oversized"
+  "relaxed fit": "Oversized"
+  "regular": "Regular"
+  "slim": "Slim"
+
+occasion_keywords:
+  casual: Casual
+  party: Party
+  sports: Sports
+  festive: Festive
+  formal: Formal
