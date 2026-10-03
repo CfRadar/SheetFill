@@ -15,11 +15,14 @@ from .text_builders import (
 NUMERIC_COLUMNS: Set[str] = {"K", "L", "O", "P", "R", "S", "T", "U", "V", "W", "X", "Z", "AN"}
 
 
-def determine_sku_base(product: ProductInput) -> str:
-    """Computes sku_base: JSON sku_base if provided, else
+def determine_sku_base(product: ProductInput, source_sheet_data: Optional[Dict[str, Any]] = None) -> str:
+    """Computes sku_base: sheet stub base if available, else JSON sku_base if provided, else
     lower(style_code.split('-')[0]) + '_os' when fit is Oversized,
     else lower(style_code.split('-')[0]).
     """
+    if source_sheet_data and source_sheet_data.get("sku_base"):
+        return str(source_sheet_data["sku_base"]).strip()
+
     if product.sku_base:
         return product.sku_base.strip()
 
@@ -134,7 +137,7 @@ def build_product_rows(
             )
         )
 
-    sku_base = determine_sku_base(product)
+    sku_base = determine_sku_base(product, source_sheet_data=source_sheet_data)
     sizes = product.sizes or mapper.defaults.get("sizes", ["S", "M", "L", "XL"])
 
     # Validate / extract source sheet images

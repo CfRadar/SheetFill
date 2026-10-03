@@ -15,7 +15,7 @@ CONTENT RULES
 2. No trademarked brand names, character names or celebrity names. Describe the art generically (e.g. "retro cartoon-inspired graphic print").
 3. Women only. Never write "Men’s/Women’s" or "Unisex".
 4. Sleeves are 3/4 sleeves. Never write "short sleeves" or "half sleeves".
-5. sku_base: lowercase, letters/numbers/underscores only, no spaces, ends with "_os" (e.g. "lobster_os").
+5. sku_base: not required in JSON (the system automatically uses the design name from your sheet).
 6. Multi-value fields use "::" with no spaces around it.
 7. For pattern, surface_styling, detail_placement and tee_length use ONLY the allowed values below, with exact spelling and capitalisation.
 
@@ -27,7 +27,6 @@ tee_length (1): Crop | Long | Medium | Short
 
 EXAMPLE (copy this structure, length and style; replace only the design-specific parts)
 {
-  "sku_base": "retro_os",
   "product_title": "Women’s Premium Oversized Printed T-Shirt",
   "product_description": "Add a stylish retro touch to your everyday wardrobe with this premium black oversized printed T-shirt. Designed with a relaxed silhouette and a bold retro cartoon-inspired graphic print, this T-shirt combines comfort with a modern streetwear aesthetic. The soft, breathable fabric and oversized fit make it suitable for casual outings, college wear, travel, and everyday styling.",
   "key_features": [
@@ -65,7 +64,7 @@ EXAMPLE (copy this structure, length and style; replace only the design-specific
 }
 
 TASK
-Now produce the JSON for the uploaded design. Keep every fixed field exactly as in the example (material, sleeve_type, neck_type, fit_type, ideal_for, color, brand_color, occasion, style_code, fabric_care, print_coverage, sleeve_details, detail_placement_rows, and the whole template text of description_override). Change only what depends on the design: sku_base, the print wording in product_description and key_features[0], pattern, search_keywords, key_features_sheet[0], surface_styling, tee_length, detail_placement and "Print Placement". Output the JSON only.`;
+Now produce the JSON for the uploaded design. Keep every fixed field exactly as in the example (material, sleeve_type, neck_type, fit_type, ideal_for, color, brand_color, occasion, style_code, fabric_care, print_coverage, sleeve_details, detail_placement_rows, and the whole template text of description_override). Change only what depends on the design: the print wording in product_description and key_features[0], pattern, search_keywords, key_features_sheet[0], surface_styling, tee_length, detail_placement and "Print Placement". Output the JSON only.`;
 
 export const PromptDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);

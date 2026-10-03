@@ -27,15 +27,44 @@ class JSONLoadError(Exception):
 
 def sanitize_json_text(text: str) -> str:
     """Repairs common formatting issues from chat pastes:
-    1. Replaces smart/curly quotes with standard ASCII quotes.
-    2. Replaces broken escaped or unescaped parentheses in key_features like \\( ... \\) with [ ... ].
-    3. Removes trailing commas before closing braces/brackets.
+    1. Strips markdown code fences (```json ... ```).
+    2. Extracts JSON block if surrounded by explanatory text.
+    3. Replaces smart/curly quotes with standard ASCII quotes.
+    4. Replaces broken escaped or unescaped parentheses in key_features like \\( ... \\) with [ ... ].
+    5. Removes trailing commas before closing braces/brackets.
     """
-    # 1. Normalize smart quotes
+    text = text.strip()
+
+    # 1. Strip markdown fences like ```json ... ``` or ``` ... ```
+    if text.startswith("```"):
+        # Remove opening fence line
+        text = re.sub(r"^```(?:json|JSON)?\s*", "", text)
+        # Remove closing fence
+        text = re.sub(r"\s*```$", "", text)
+        text = text.strip()
+    elif "```" in text:
+        # Extract content between first pair of fences if present
+        m = re.search(r"```(?:json|JSON)?\s*(.*?)\s*```", text, flags=re.DOTALL)
+        if m:
+            text = m.group(1).strip()
+
+    # If text still contains non-JSON text at start/end, try to extract outer JSON object/array
+    if not (text.startswith("{") or text.startswith("[")):
+        first_brace = text.find("{")
+        first_bracket = text.find("[")
+        candidates = [idx for idx in [first_brace, first_bracket] if idx != -1]
+        if candidates:
+            start_pos = min(candidates)
+            is_brace = (start_pos == first_brace)
+            end_char = "}" if is_brace else "]"
+            end_pos = text.rfind(end_char)
+            if end_pos != -1 and end_pos > start_pos:
+                text = text[start_pos : end_pos + 1].strip()
+
+    # 2. Normalize smart quotes
     text = text.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'")
 
-    # 2. Repair key_features: \( ... \) or ( ... )
-    # Matches "key_features"\s*:\s*\( ... \) or \\( ... \\)
+    # 3. Repair key_features: \( ... \) or ( ... )
     text = re.sub(
         r'("key_features"\s*:\s*)\\?\(\s*(.*?)\s*\\?\)',
         r"\1[\2]",
@@ -43,7 +72,7 @@ def sanitize_json_text(text: str) -> str:
         flags=re.DOTALL,
     )
 
-    # 3. Remove trailing commas before } or ]
+    # 4. Remove trailing commas before } or ]
     text = re.sub(r",\s*([}\]])", r"\1", text)
 
     return text

@@ -206,7 +206,7 @@ def read_source_sheet_stubs(source_sheet_path: Union[str, Path]) -> Dict[str, Di
             if base in stubs:
                 continue
 
-            row_data = {}
+            row_data = {"sku_base": base}
             for col_name, c_idx in cols_of_interest.items():
                 if col_name == "G":
                     continue

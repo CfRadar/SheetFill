@@ -77,13 +77,26 @@ def build_design_rows(
                 )
             )
     else:
-        # Orphan or manual slot requires sku_base in JSON
+        # Orphan or manual slot without stub_base in sheet
+        if not json_base:
+            import re
+            style_code = (json_data.get("style_code") or "").strip()
+            title = (json_data.get("product_title") or "").strip()
+            if style_code:
+                prefix = re.sub(r"[^a-zA-Z0-9_]", "", style_code.split("-")[0].strip().lower())
+                json_base = f"{prefix}_os" if prefix else None
+            elif title:
+                m = re.search(r"–\s*([^–]+?)\s*(?:Graphic Print|T-Shirt|$)", title, flags=re.IGNORECASE)
+                if m:
+                    cand = re.sub(r"[^a-zA-Z0-9_]", "_", m.group(1).strip().lower()).strip("_")
+                    json_base = f"{cand}_os" if not cand.endswith("_os") else cand
+
         if not json_base:
             errors.append(
                 ValidationIssue(
                     level="ERROR",
                     field="sku_base",
-                    message="sku_base is required for new or orphan designs.",
+                    message="sku_base is not in sheet; please specify sku_base, style_code, or product_title.",
                 )
             )
             return BuildResult(

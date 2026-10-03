@@ -187,6 +187,18 @@ def match_bulk_json(
                 match_how = "fuzzy"
                 confidence = round(scores[0][1] / 100.0, 2)
 
+        # Stage 4.5: Match against product_title if sku_base is absent
+        if not best_match_id and title:
+            norm_title = _normalize_name(title)
+            for did, d in available_designs.items():
+                if d.base:
+                    base_stripped = _normalize_name(_strip_os_suffix(d.base))
+                    if base_stripped and (base_stripped in norm_title or norm_title in base_stripped):
+                        best_match_id = did
+                        match_how = "title"
+                        confidence = 0.95
+                        break
+
         if best_match_id and match_how:
             d = available_designs.pop(best_match_id)
             matched_json_indices.add(j_idx)

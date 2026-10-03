@@ -169,20 +169,67 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
     # Tolerant parsing
     raw_text = req.raw_text.strip()
     if not raw_text:
-        return _json_error(400, "EMPTY_JSON", "JSON payload is empty")
+        store.save_design_json(
+            session_id=sid,
+            design_id=did,
+            raw_text="",
+            parsed_json={},
+            status="needs_json",
+            warnings=[],
+            errors=[],
+        )
+        return PutJsonResponse(
+            status="needs_json",
+            repaired=False,
+            errors=[],
+            warnings=[],
+            parsed_json=None,
+            preview_rows=[],
+        )
 
     was_repaired = False
     try:
-        # First check if sanitization would differ from original text
         sanitized = sanitize_json_text(raw_text)
         if sanitized != raw_text:
             was_repaired = True
         parsed_items = parse_single_json_content(raw_text)
         parsed_json = parsed_items[0] if parsed_items else {}
     except JSONLoadError as jle:
-        return _json_error(400, "JSON_SYNTAX_ERROR", str(jle))
+        store.save_design_json(
+            session_id=sid,
+            design_id=did,
+            raw_text=req.raw_text,
+            parsed_json={},
+            status="invalid",
+            warnings=[],
+            errors=[str(jle)],
+        )
+        return PutJsonResponse(
+            status="invalid",
+            repaired=False,
+            errors=[ValidationIssue(level="ERROR", field="JSON", message=str(jle))],
+            warnings=[],
+            parsed_json=None,
+            preview_rows=[],
+        )
     except Exception as e:
-        return _json_error(400, "JSON_PARSE_ERROR", f"Could not parse JSON: {str(e)}")
+        store.save_design_json(
+            session_id=sid,
+            design_id=did,
+            raw_text=req.raw_text,
+            parsed_json={},
+            status="invalid",
+            warnings=[],
+            errors=[str(e)],
+        )
+        return PutJsonResponse(
+            status="invalid",
+            repaired=False,
+            errors=[ValidationIssue(level="ERROR", field="JSON", message=f"Could not parse JSON: {str(e)}")],
+            warnings=[],
+            parsed_json=None,
+            preview_rows=[],
+        )
 
     # Mapper & builder
     mapper = get_default_mapper(_get_master_template_path())
@@ -368,7 +415,6 @@ def get_json_template(sid: str, did: str) -> Any:
         return _json_error(404, "DESIGN_NOT_FOUND", f"Design '{did}' not found")
 
     skeleton = {
-        "sku_base": target.base or "",
         "product_title": "",
         "product_description": "",
         "key_features": [
