@@ -98,7 +98,9 @@ def read_tshirt_sheet(file_path: str, master_template_path: Optional[str] = None
     headers: Dict[str, str] = {}
     raw_rows: List[RawRow] = []
 
-    if ext == ".xls":
+    import zipfile
+
+    if ext == ".xls" and not zipfile.is_zipfile(file_path):
         wb_xls = xlrd.open_workbook(file_path, formatting_info=False)
         try:
             if "t_shirt" not in wb_xls.sheet_names():
@@ -131,8 +133,10 @@ def read_tshirt_sheet(file_path: str, master_template_path: Optional[str] = None
             pass
 
     else:
-        wb = openpyxl.load_workbook(file_path, read_only=False, keep_vba=False, data_only=True)
+        # If the file ends with .xls but is a zip archive, pass a file-like object so openpyxl doesn't reject .xls
+        f_target = open(file_path, "rb") if ext == ".xls" else file_path
         try:
+            wb = openpyxl.load_workbook(f_target, read_only=False, keep_vba=False, data_only=True)
             if "t_shirt" not in wb.sheetnames:
                 raise ValueError("Sheet 't_shirt' not found in uploaded workbook.")
             sh = wb["t_shirt"]
@@ -155,7 +159,8 @@ def read_tshirt_sheet(file_path: str, master_template_path: Optional[str] = None
                     cells[col_letter] = _clean_cell_value(raw_val)
                 raw_rows.append(RawRow(row_index=r, cells=cells))
         finally:
-            wb.close()
+            if hasattr(f_target, "close"):
+                f_target.close()
 
     return RawSheet(
         headers=headers,

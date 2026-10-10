@@ -222,8 +222,11 @@ def fill(
     else:
         out_dir = Path("output")
         out_dir.mkdir(parents=True, exist_ok=True)
-        stem = json_path.stem if json_path.is_file() else "batch"
-        output_file = out_dir / f"{stem}_{timestamp_str}.xlsm"
+        if source_sheet:
+            stem = source_sheet.stem
+        else:
+            stem = json_path.stem if json_path.is_file() else "batch"
+        output_file = out_dir / f"{stem}.xls"
 
     console.print(f"[dim]Patching workbook -> '{output_file}'...[/dim]")
     try:

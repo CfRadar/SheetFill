@@ -11,7 +11,7 @@ import { PromptDropdown } from "./components/PromptDropdown";
 
 export const App: React.FC = () => {
   const { session, setSession, error, setError, isBulkDialogOpen, setBulkDialogOpen } = useAppStore();
-  const [downloadInfo, setDownloadInfo] = useState<{ url: string; report: any } | null>(null);
+  const [downloadInfo, setDownloadInfo] = useState<{ url: string; report: any; filename?: string } | null>(null);
 
   useEffect(() => {
     // Restore session from query param if available
@@ -22,7 +22,7 @@ export const App: React.FC = () => {
         .then((s) => {
           setSession(s);
           if (s.download_url && s.report) {
-            setDownloadInfo({ url: s.download_url, report: s.report });
+            setDownloadInfo({ url: s.download_url, report: s.report, filename: s.output_filename || undefined });
           }
         })
         .catch((err) => {
@@ -33,8 +33,8 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const handleGenerated = (downloadUrl: string, report: any) => {
-    setDownloadInfo({ url: downloadUrl, report });
+  const handleGenerated = (downloadUrl: string, report: any, filename?: string) => {
+    setDownloadInfo({ url: downloadUrl, report, filename });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -108,6 +108,7 @@ export const App: React.FC = () => {
                 <ReportPanel
                   report={downloadInfo.report}
                   downloadUrl={downloadInfo.url}
+                  filename={downloadInfo.filename}
                   onReset={() => setDownloadInfo(null)}
                 />
               )}

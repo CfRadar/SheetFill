@@ -138,7 +138,10 @@ export async function getJsonTemplate(sessionId: string, designId: string): Prom
   return res.json();
 }
 
-export async function generateWorkbook(sessionId: string, mode: "ready_only" | "all_or_nothing"): Promise<{ download_url: string; report: any }> {
+export async function generateWorkbook(
+  sessionId: string,
+  mode: "ready_only" | "all_or_nothing"
+): Promise<{ download_url: string; report: any; filename?: string }> {
   const res = await fetch(`${BASE_URL}/sheets/${sessionId}/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

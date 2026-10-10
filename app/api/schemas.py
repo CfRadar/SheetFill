@@ -37,6 +37,7 @@ class SessionResponse(BaseModel):
     design_image_edits: Dict[str, List[Optional[str]]]
     design_product_links: Dict[str, Optional[str]]
     download_url: Optional[str] = None
+    output_filename: Optional[str] = None
     report: Optional[Dict[str, Any]] = None
 
 
@@ -111,3 +112,4 @@ class GenerateRequest(BaseModel):
 class GenerateResponse(BaseModel):
     download_url: str
     report: Dict[str, Any]
+    filename: Optional[str] = None

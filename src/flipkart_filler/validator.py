@@ -103,8 +103,13 @@ def verify_workbook_content(
     """
     issues: List[ValidationIssue] = []
 
-    t_wb = openpyxl.load_workbook(template_path, data_only=True, read_only=True)
-    o_wb = openpyxl.load_workbook(output_path, data_only=True, read_only=True)
+    t_wb = openpyxl.load_workbook(template_path, data_only=True, read_only=False)
+    f_target = open(output_path, "rb") if str(output_path).lower().endswith(".xls") else output_path
+    try:
+        o_wb = openpyxl.load_workbook(f_target, data_only=True, read_only=False)
+    finally:
+        if hasattr(f_target, "close"):
+            f_target.close()
 
     t_ws = t_wb["t_shirt"]
     o_ws = o_wb["t_shirt"]

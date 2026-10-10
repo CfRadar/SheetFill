@@ -127,6 +127,7 @@ def get_session_state(sid: str) -> Any:
         design_image_edits=session.design_image_edits,
         design_product_links=session.design_product_links,
         download_url=download_url,
+        output_filename=session.output_filename,
         report=session.report,
     )
 
@@ -482,11 +483,11 @@ def generate_workbook(sid: str, req: GenerateRequest) -> Any:
     if not ready_rows_map and not any(d.status == "complete" for d in session.designs):
         return _json_error(400, "NO_READY_DESIGNS", "At least one design must be ready to generate.")
 
-    # Generate workbook
+    # Generate workbook with same base name in .xls format
     sdir = store._session_dir(sid)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base_name = Path(session.original_filename).stem
-    out_filename = f"{base_name}_filled_{ts}.xlsm"
+    orig_name = session.original_filename or "sheet.xls"
+    base_name = Path(orig_name).stem
+    out_filename = f"{base_name}.xls"
     out_path = sdir / out_filename
 
     try:
@@ -507,7 +508,7 @@ def generate_workbook(sid: str, req: GenerateRequest) -> Any:
     store.save_session(session)
 
     download_url = f"/api/sheets/{sid}/download"
-    return GenerateResponse(download_url=download_url, report=report)
+    return GenerateResponse(download_url=download_url, report=report, filename=out_filename)
 
 
 @router.get("/sheets/{sid}/download")
@@ -524,5 +525,5 @@ def download_workbook(sid: str) -> Any:
     return FileResponse(
         path=str(fpath),
         filename=session.output_filename,
-        media_type="application/vnd.ms-excel.sheet.macroEnabled.12",
+        media_type="application/vnd.ms-excel",
     )

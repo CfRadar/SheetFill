@@ -100,7 +100,7 @@ def rebuild_tshirt_workbook(
         # Write to temporary file first
         out_p = Path(output_path)
         out_p.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_file = tempfile.mkstemp(suffix=".xlsm", dir=str(out_p.parent))
+        fd, temp_file = tempfile.mkstemp(suffix=out_p.suffix or ".xls", dir=str(out_p.parent))
         os.close(fd)
 
         try:

@@ -40,6 +40,7 @@ export interface SessionState {
   design_image_edits: Record<string, (string | null)[]>;
   design_product_links: Record<string, string | null>;
   download_url?: string | null;
+  output_filename?: string | null;
   report?: any;
 }
 

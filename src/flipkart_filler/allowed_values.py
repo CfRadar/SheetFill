@@ -135,22 +135,27 @@ def load_allowed_values(template_path: Union[str, Path]) -> Dict[str, List[str]]
 
 def read_existing_skus(workbook_path: Union[str, Path]) -> Set[str]:
     """Reads all existing Seller SKU IDs from column G (rows 5..500) of t_shirt."""
-    wb = openpyxl.load_workbook(workbook_path, data_only=True, read_only=True)
+    f_target = open(workbook_path, "rb") if str(workbook_path).lower().endswith(".xls") else workbook_path
     skus: Set[str] = set()
     try:
-        if "t_shirt" not in wb.sheetnames:
-            return skus
+        wb = openpyxl.load_workbook(f_target, data_only=True, read_only=False)
+        try:
+            if "t_shirt" not in wb.sheetnames:
+                return skus
 
-        ws = wb["t_shirt"]
-        # Column G is column 7
-        for row in range(5, 501):
-            val = ws.cell(row=row, column=7).value
-            if val is not None:
-                s_val = str(val).strip()
-                if s_val:
-                    skus.add(s_val)
+            ws = wb["t_shirt"]
+            # Column G is column 7
+            for row in range(5, 501):
+                val = ws.cell(row=row, column=7).value
+                if val is not None:
+                    s_val = str(val).strip()
+                    if s_val:
+                        skus.add(s_val)
+        finally:
+            wb.close()
     finally:
-        wb.close()
+        if hasattr(f_target, "close"):
+            f_target.close()
     return skus
 
 

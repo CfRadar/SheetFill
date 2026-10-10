@@ -3,7 +3,7 @@ import { generateWorkbook } from "../api";
 import { useAppStore } from "../store";
 
 interface GenerateBarProps {
-  onGenerated: (downloadUrl: string, report: any) => void;
+  onGenerated: (downloadUrl: string, report: any, filename?: string) => void;
 }
 
 export const GenerateBar: React.FC<GenerateBarProps> = ({ onGenerated }) => {
@@ -23,7 +23,7 @@ export const GenerateBar: React.FC<GenerateBarProps> = ({ onGenerated }) => {
       setIsGenerating(true);
       setError(null);
       const res = await generateWorkbook(session.session_id, mode);
-      onGenerated(res.download_url, res.report);
+      onGenerated(res.download_url, res.report, res.filename);
     } catch (err: any) {
       setError(err?.message || "Generation failed");
     } finally {
@@ -81,7 +81,7 @@ export const GenerateBar: React.FC<GenerateBarProps> = ({ onGenerated }) => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Generate .xlsm
+              Generate .xls
             </>
           )}
         </button>
