@@ -900,25 +900,30 @@ export const AdminDashboard: React.FC = () => {
                     </Button>
                   </div>
                 ) : (
-                  <form id="create-user-form" onSubmit={handleCreateSubmit} className="space-y-3.5">
-                    <Input
-                      label="Username"
-                      labelPlacement="outside"
-                      placeholder="e.g. rajesh_textiles"
-                      value={newUsername}
-                      onChange={(e) => setNewUsername(e.target.value.toLowerCase())}
-                      isRequired
-                      size="sm"
-                      aria-label="Username"
-                    />
+                  <form id="create-user-form" onSubmit={handleCreateSubmit} className="space-y-4">
+                    <div>
+                      <label className="text-xs font-medium text-foreground block mb-1.5">
+                        Username <span className="text-danger">*</span>
+                      </label>
+                      <Input
+                        placeholder="e.g. rajesh_textiles"
+                        value={newUsername}
+                        onChange={(e) => setNewUsername(e.target.value.toLowerCase())}
+                        isRequired
+                        size="sm"
+                        aria-label="Username"
+                      />
+                    </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-foreground">Password</span>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-medium text-foreground">
+                          Password <span className="text-danger">*</span>
+                        </label>
                         <button
                           type="button"
                           onClick={generatePassword}
-                          className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                          className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
                         >
                           <Sparkles className="w-3 h-3" />
                           Auto-generate
@@ -935,21 +940,24 @@ export const AdminDashboard: React.FC = () => {
                       />
                     </div>
 
-                    <Input
-                      label="Display name / Business name"
-                      labelPlacement="outside"
-                      placeholder="e.g. Rajesh Textiles Surat"
-                      value={newDisplayName}
-                      onChange={(e) => setNewDisplayName(e.target.value)}
-                      size="sm"
-                      aria-label="Display name"
-                    />
+                    <div>
+                      <label className="text-xs font-medium text-foreground block mb-1.5">
+                        Display name / Business name
+                      </label>
+                      <Input
+                        placeholder="e.g. Rajesh Textiles Surat"
+                        value={newDisplayName}
+                        onChange={(e) => setNewDisplayName(e.target.value)}
+                        size="sm"
+                        aria-label="Display name"
+                      />
+                    </div>
 
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-medium text-foreground">
+                        <label className="text-xs font-medium text-foreground">
                           Access duration
-                        </span>
+                        </label>
                         <span className="text-[11px] text-default-400 font-mono">
                           {newDurationDays > 0 ? `${newDurationDays} days` : "Custom"}
                         </span>
@@ -992,15 +1000,18 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <Input
-                      label="Administrative notes (WhatsApp, payment ref)"
-                      labelPlacement="outside"
-                      placeholder="e.g. Paid via UPI, contact +919876543210"
-                      value={newNotes}
-                      onChange={(e) => setNewNotes(e.target.value)}
-                      size="sm"
-                      aria-label="Notes"
-                    />
+                    <div>
+                      <label className="text-xs font-medium text-foreground block mb-1.5">
+                        Administrative notes (WhatsApp, payment ref)
+                      </label>
+                      <Input
+                        placeholder="e.g. Paid via UPI, contact +919876543210"
+                        value={newNotes}
+                        onChange={(e) => setNewNotes(e.target.value)}
+                        size="sm"
+                        aria-label="Notes"
+                      />
+                    </div>
                   </form>
                 )}
               </ModalBody>
