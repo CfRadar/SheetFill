@@ -9,13 +9,16 @@ import {
   Alert,
   Progress,
 } from "@heroui/react";
-import { Eye, EyeOff, Lock, User, RefreshCw, Laptop } from "lucide-react";
+import { motion } from "framer-motion";
+import { Eye, EyeOff, Lock, User, RefreshCw, Laptop, Sun, Moon, Sparkles } from "lucide-react";
 import { useAuthStore } from "./authStore";
 import { useServerWake } from "../wake/useServerWake";
+import { useTheme } from "../ui/theme";
 
 export const LoginPage: React.FC = () => {
   const { login, isLoading, errorNotice, setErrorNotice } = useAuthStore();
   const { status: wakeStatus, elapsedSeconds, retry: retryWake } = useServerWake();
+  const { isDark, toggleTheme } = useTheme();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -90,93 +93,143 @@ export const LoginPage: React.FC = () => {
   const isSessionReplaced = errorNotice?.code === "SESSION_REPLACED";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
-      <Card className="max-w-md w-full shadow-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-3xl p-3 sm:p-5">
-        <CardHeader className="flex flex-col items-center justify-center pb-2 pt-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-yellow-300 font-black text-xl shadow-md mb-3">
-            FK
-          </div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Sign in
-          </h1>
-        </CardHeader>
+    <div
+      className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-background text-foreground transition-colors duration-200"
+      style={{
+        background: isDark
+          ? "radial-gradient(circle at 10% 10%, rgba(91, 91, 214, 0.15) 0%, transparent 45%), #0E1016"
+          : "radial-gradient(circle at 10% 10%, rgba(91, 91, 214, 0.10) 0%, transparent 45%), #F6F7FB",
+      }}
+    >
+      {/* Theme toggle in top right */}
+      <div className="absolute top-4 right-4 z-10">
+        <Button
+          isIconOnly
+          size="sm"
+          variant="light"
+          onPress={toggleTheme}
+          aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          className="text-default-500 hover:text-foreground rounded-[10px]"
+        >
+          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-default-600" />}
+        </Button>
+      </div>
 
-        <CardBody className="py-4">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Error / Alert banner */}
-            {errorMessage && (
-              <Alert
-                color={isSessionReplaced ? "warning" : "danger"}
-                variant="flat"
-                startContent={
-                  isSessionReplaced ? (
-                    <Laptop className="w-4 h-4 shrink-0" />
-                  ) : undefined
-                }
-                title={errorMessage}
-                className="text-xs font-medium"
+      {/* Centered Login Card with 280ms mount transition */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: [0.2, 0, 0, 1] }}
+        className="w-full max-w-[400px]"
+      >
+        <Card className="w-full shadow-sm border border-divider bg-content1 rounded-[14px] p-2 sm:p-4">
+          <CardHeader className="flex flex-col items-center justify-center pb-2 pt-4">
+            <div className="w-11 h-11 rounded-[10px] bg-primary flex items-center justify-center text-white shadow-sm mb-2">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Sign in
+            </h1>
+          </CardHeader>
+
+          <CardBody className="py-3 px-3 sm:px-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <Input
+                label="Username"
+                labelPlacement="outside"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                variant="bordered"
+                autoComplete="username"
+                autoFocus
+                disabled={isLoading || isQueuedForWake}
+                startContent={<User className="w-4 h-4 text-default-400 shrink-0" />}
+                classNames={{
+                  inputWrapper: "h-10 rounded-[10px] border-divider hover:border-default-400",
+                  label: "text-[13px] font-medium text-default-600 mb-1",
+                  input: "text-sm",
+                }}
               />
-            )}
 
-            <Input
-              label="Username"
-              placeholder="Enter your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              variant="bordered"
-              labelPlacement="outside"
-              autoComplete="username"
-              autoFocus
-              disabled={isLoading || isQueuedForWake}
-              startContent={<User className="w-4 h-4 text-slate-400 shrink-0" />}
-            />
+              <Input
+                label="Password"
+                labelPlacement="outside"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={showPassword ? "text" : "password"}
+                variant="bordered"
+                autoComplete="current-password"
+                disabled={isLoading || isQueuedForWake}
+                startContent={<Lock className="w-4 h-4 text-default-400 shrink-0" />}
+                endContent={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="focus:outline-none p-1 text-default-400 hover:text-default-600 dark:hover:text-default-200 transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                }
+                classNames={{
+                  inputWrapper: "h-10 rounded-[10px] border-divider hover:border-default-400",
+                  label: "text-[13px] font-medium text-default-600 mb-1",
+                  input: "text-sm",
+                }}
+              />
 
-            <Input
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type={showPassword ? "text" : "password"}
-              variant="bordered"
-              labelPlacement="outside"
-              autoComplete="current-password"
-              disabled={isLoading || isQueuedForWake}
-              startContent={<Lock className="w-4 h-4 text-slate-400 shrink-0" />}
-              endContent={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="focus:outline-none p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+              {/* Error Alert above the button with 200ms animation */}
+              {errorMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              }
-            />
+                  <Alert
+                    color={isSessionReplaced ? "warning" : "danger"}
+                    variant="flat"
+                    startContent={
+                      isSessionReplaced ? (
+                        <Laptop className="w-4 h-4 shrink-0" />
+                      ) : undefined
+                    }
+                    title={errorMessage}
+                    className="text-xs font-medium rounded-[10px]"
+                  />
+                </motion.div>
+              )}
 
-            <Button
-              type="submit"
-              color="primary"
-              size="lg"
-              className="w-full font-bold mt-2 shadow-sm"
-              isLoading={isLoading || isQueuedForWake}
-            >
-              {isQueuedForWake ? "Connecting..." : isLoading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-        </CardBody>
+              <Button
+                type="submit"
+                color="primary"
+                variant="solid"
+                className="w-full h-10 font-semibold rounded-[10px] text-sm mt-1 shadow-xs active:scale-[0.98] transition-transform duration-120"
+                isLoading={isLoading || isQueuedForWake}
+              >
+                {isQueuedForWake ? "Connecting..." : isLoading ? "Signing in..." : "Sign in"}
+              </Button>
+            </form>
+          </CardBody>
 
-        <CardFooter className="flex justify-center pt-0 pb-3">
-          <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
-            Need an account? Contact the owner.
-          </p>
-        </CardFooter>
-      </Card>
+          <CardFooter className="flex justify-center pt-2 pb-4">
+            <p className="text-xs text-default-400 text-center">
+              Need an account? Contact the owner.
+            </p>
+          </CardFooter>
+        </Card>
+      </motion.div>
 
       {/* Non-blocking Server Wake Indicator under the card */}
       {(wakeStatus === "waking" || wakeStatus === "checking") && (
-        <div className="mt-4 max-w-md w-full px-4 py-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm transition-all duration-200">
-          <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 mb-1.5 font-medium">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
+          className="mt-4 w-full max-w-[400px] px-4 py-3 rounded-[10px] border border-divider bg-content1/80 backdrop-blur-sm"
+        >
+          <div className="flex items-center justify-between text-xs text-default-500 mb-1.5 font-medium">
             <span>Starting server...</span>
             <span className="font-mono text-[11px]">{elapsedSeconds}s</span>
           </div>
@@ -185,14 +238,14 @@ export const LoginPage: React.FC = () => {
             isIndeterminate={elapsedSeconds < 2}
             value={Math.min(100, Math.round((elapsedSeconds / 50) * 100))}
             color="primary"
-            className="w-full"
+            className="w-full h-1"
           />
-        </div>
+        </motion.div>
       )}
 
       {/* 120s timeout failure notice */}
       {wakeStatus === "failed" && (
-        <div className="mt-4 max-w-md w-full px-4 py-3 rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/40 flex items-center justify-between text-xs text-rose-800 dark:text-rose-200">
+        <div className="mt-4 w-full max-w-[400px] px-4 py-3 rounded-[10px] border border-danger-200 dark:border-danger-900/50 bg-danger-50/80 dark:bg-danger-950/40 flex items-center justify-between text-xs text-danger-700 dark:text-danger-300">
           <span>Can't reach the server.</span>
           <Button
             size="sm"
