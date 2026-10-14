@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Button, Chip } from "@heroui/react";
+import { CheckCircle2, AlertCircle, Copy, Wand2, Check } from "lucide-react";
 import { getJsonTemplate, saveDesignJson } from "../api";
 import { PutJsonResponse, ValidationIssue } from "../types";
+import { toast } from "../ui/ToastProvider";
 
 interface JsonEditorProps {
   sessionId: string;
   designId: string;
   initialText: string;
   onValidated: (res: PutJsonResponse) => void;
+  onReadyStateChange?: (isReady: boolean) => void;
 }
 
 export const JsonEditor: React.FC<JsonEditorProps> = ({
@@ -14,6 +18,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
   designId,
   initialText,
   onValidated,
+  onReadyStateChange,
 }) => {
   const [text, setText] = useState<string>(initialText || "");
   const [isValidating, setIsValidating] = useState<boolean>(false);
@@ -24,6 +29,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
   const validate = async (val: string) => {
     if (!val.trim()) {
       setIssues([]);
+      onReadyStateChange?.(false);
       return;
     }
     try {
@@ -31,6 +37,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
       const res = await saveDesignJson(sessionId, designId, val);
       setIssues([...res.errors, ...res.warnings]);
       onValidated(res);
+      onReadyStateChange?.(res.status === "ready");
     } catch (err: any) {
       setIssues([
         {
@@ -39,6 +46,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
           message: err?.message || "Validation failed",
         },
       ]);
+      onReadyStateChange?.(false);
     } finally {
       setIsValidating(false);
     }
@@ -50,7 +58,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       validate(val);
-    }, 500);
+    }, 450);
   };
 
   const handleCopyTemplate = async () => {
@@ -59,6 +67,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
       const str = JSON.stringify(templateObj, null, 2);
       await navigator.clipboard.writeText(str);
       setCopySuccess(true);
+      toast.success("JSON template copied!");
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (err) {
       console.error(err);
@@ -76,8 +85,8 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
       const formatted = JSON.stringify(obj, null, 2);
       setText(formatted);
       validate(formatted);
+      toast.success("JSON formatted and repaired");
     } catch (err) {
-      // If parsing fails, just trigger validate to display precise error
       validate(text);
     }
   };
@@ -88,7 +97,6 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
       if (field in obj) {
         obj[field] = suggestion;
       } else {
-        // try lowercase / mapping alias
         const foundKey = Object.keys(obj).find((k) => k.toLowerCase() === field.toLowerCase());
         if (foundKey) obj[foundKey] = suggestion;
       }
@@ -100,74 +108,122 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
     }
   };
 
+  const errorIssues = issues.filter((i) => i.level === "ERROR");
+  const hasText = text.trim().length > 0;
+  const isValid = hasText && !isValidating && errorIssues.length === 0;
+
   return (
     <div className="space-y-3">
-      {/* Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* Action Header with Clean HeroUI Buttons */}
+      <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-700">Product Specification JSON</span>
-          {isValidating && <span className="text-xs text-blue-500 animate-pulse">Checking...</span>}
+          <span className="text-sm font-semibold text-foreground">Product Specification JSON</span>
+          {isValidating && (
+            <span className="text-xs text-primary animate-pulse font-medium">Validating...</span>
+          )}
         </div>
+
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopyTemplate}
-            className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded shadow-xs transition-colors"
+          <Button
+            size="sm"
+            variant="light"
+            onPress={handleCopyTemplate}
+            startContent={copySuccess ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5 text-default-400" />}
+            className="h-8 px-2.5 rounded-[8px] text-xs font-medium text-default-600 hover:text-foreground"
           >
-            {copySuccess ? "Copied!" : "Copy JSON template"}
-          </button>
-          <button
-            type="button"
-            onClick={handleFormatRepair}
-            className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded transition-colors"
+            {copySuccess ? "Copied" : "Copy template"}
+          </Button>
+
+          <Button
+            size="sm"
+            variant="flat"
+            color="default"
+            onPress={handleFormatRepair}
+            startContent={<Wand2 className="w-3.5 h-3.5 text-default-500" />}
+            className="h-8 px-3 rounded-[8px] text-xs font-medium text-foreground bg-content3 hover:bg-default-200 border border-divider transition-colors"
           >
             Repair & format
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Editor Textarea */}
+      {/* Editor Textarea with Floating Validation Chip */}
       <div className="relative">
         <textarea
-          rows={8}
+          rows={9}
           value={text}
           onChange={handleChange}
-          placeholder='{\n  "product_title": "...",\n  "material": "Cotton Blend",\n  ...\n}'
-          className="w-full font-mono text-xs p-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent leading-relaxed"
+          placeholder='{\n  "product_title": "Women’s Premium Oversized Printed T-Shirt",\n  "material": "Cotton Blend",\n  ...\n}'
+          className="w-full font-mono text-[13px] p-4 pb-10 rounded-[10px] border border-divider bg-content3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-transparent leading-relaxed resize-y select-text"
           spellCheck={false}
         />
+
+        {/* Live Validation Chip seated at bottom right of editor box */}
+        <div className="absolute right-3 bottom-3 z-10 pointer-events-none">
+          {isValidating ? (
+            <Chip size="sm" variant="flat" color="primary" className="h-6 text-[11px] font-medium">
+              Checking...
+            </Chip>
+          ) : !hasText ? (
+            <Chip size="sm" variant="flat" color="default" className="h-6 text-[11px] font-medium border border-divider">
+              No JSON
+            </Chip>
+          ) : isValid ? (
+            <Chip
+              size="sm"
+              variant="flat"
+              color="success"
+              startContent={<CheckCircle2 className="w-3.5 h-3.5 shrink-0 ml-0.5" />}
+              className="h-6 text-[11px] font-semibold border border-success-200 dark:border-success-900/40"
+            >
+              Valid JSON
+            </Chip>
+          ) : (
+            <Chip
+              size="sm"
+              variant="flat"
+              color="danger"
+              startContent={<AlertCircle className="w-3.5 h-3.5 shrink-0 ml-0.5" />}
+              className="h-6 text-[11px] font-semibold border border-danger-200 dark:border-danger-900/40"
+            >
+              {errorIssues.length} error{errorIssues.length > 1 ? "s" : ""}
+            </Chip>
+          )}
+        </div>
       </div>
 
-      {/* Errors & Suggestions List */}
+      {/* Issues & Quick-Fix Suggestions */}
       {issues.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 pt-1">
           {issues.map((iss, i) => (
             <div
               key={i}
-              className={`p-2 text-xs rounded-md border flex flex-col md:flex-row md:items-center justify-between gap-2 ${
+              className={`p-3 text-xs rounded-[10px] border flex flex-col md:flex-row md:items-center justify-between gap-2 transition-colors ${
                 iss.level === "ERROR"
-                  ? "bg-red-50 border-red-200 text-red-700"
-                  : "bg-amber-50 border-amber-200 text-amber-800"
+                  ? "bg-rose-50/90 dark:bg-rose-950/50 border-rose-200 dark:border-rose-800/60 text-rose-900 dark:text-rose-100"
+                  : "bg-amber-50/90 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-100"
               }`}
             >
               <div>
-                <strong className="font-semibold uppercase text-[10px] tracking-wide mr-1.5">
+                <strong className="font-semibold uppercase text-[10px] tracking-wide mr-1.5 opacity-90">
                   [{iss.level}] {iss.field}:
                 </strong>
                 <span>{iss.message}</span>
               </div>
               {iss.suggestions && iss.suggestions.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-medium opacity-80">Suggestions:</span>
+                  <span className="text-[10px] font-medium opacity-80">Quick fix:</span>
                   {iss.suggestions.slice(0, 3).map((sug, sIdx) => (
-                    <button
+                    <Button
                       key={sIdx}
-                      type="button"
-                      onClick={() => handleApplySuggestion(iss.field, sug)}
-                      className="px-1.5 py-0.5 text-[10px] font-semibold bg-white border border-current rounded hover:bg-opacity-20 transition-colors"
+                      size="sm"
+                      variant="flat"
+                      color="primary"
+                      onPress={() => handleApplySuggestion(iss.field, sug)}
+                      className="h-6 text-[11px] px-2 rounded-[6px] font-medium"
                     >
                       Use "{sug}"
-                    </button>
+                    </Button>
                   ))}
                 </div>
               )}

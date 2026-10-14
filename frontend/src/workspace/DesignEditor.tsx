@@ -4,7 +4,7 @@ import {
   CardHeader,
   CardBody,
   Button,
-  Chip,
+  Tooltip,
   Modal,
   ModalContent,
   ModalHeader,
@@ -30,6 +30,7 @@ import { BrandMetaEditor } from "../components/BrandMetaEditor";
 import { ImageLinksEditor } from "../components/ImageLinksEditor";
 import { RowsPreview } from "../components/RowsPreview";
 import { toast } from "../ui/ToastProvider";
+import { resolveDesignSizes } from "../utils/designUtils";
 
 interface DesignEditorProps {
   design: DetectedDesign;
@@ -54,9 +55,8 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 }) => {
   const { session, setSession, setError } = useAppStore();
 
-  const [sizes, setSizes] = useState<string[]>(
-    session?.design_sizes[design.id] ||
-      (design.sizes_found.length > 0 ? design.sizes_found : ["S", "M", "L", "XL"])
+  const [sizes, setSizes] = useState<string[]>(() =>
+    resolveDesignSizes(session?.design_sizes[design.id], design.sizes_found)
   );
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [isBrandMetaExpanded, setIsBrandMetaExpanded] = useState(false);
@@ -124,12 +124,14 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const imagesCount = (session?.design_image_edits[design.id] || design.image_urls).filter(Boolean).length;
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto pb-12">
-      {/* Design Header Card */}
-      <Card shadow="sm" className="border border-divider bg-content1">
-        <CardHeader className="p-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-xl bg-default-100 border border-divider overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-sm text-default-400">
+    <div className="space-y-5 max-w-4xl mx-auto pb-12">
+      {/* 1. Design Header Card */}
+      <Card shadow="sm" className="border border-divider bg-content1 rounded-[14px]">
+        <CardHeader className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+          {/* Thumbnail & Title metadata */}
+          <div className="flex items-center gap-3.5 min-w-0">
+            {/* Thumbnail 48px */}
+            <div className="w-12 h-12 rounded-[10px] bg-content3 border border-divider overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-sm text-default-400">
               {design.main_image_url ? (
                 <img
                   src={design.main_image_url}
@@ -147,23 +149,25 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-foreground truncate">
+                <h2 className="text-lg font-semibold tracking-tight text-foreground truncate">
                   #{index + 1} {design.base || "Unnamed stub"}
-                </h3>
-                <span className="text-xs text-default-400 font-mono">({sheetRowsStr})</span>
+                </h2>
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <StatusChip status={design.status} size="sm" />
-                <span className="text-xs text-default-400">
-                  {sizes.length} sizes configured
-                </span>
+              <div className="text-xs text-default-400 mt-0.5 flex items-center gap-2 font-medium">
+                <span>{sheetRowsStr}</span>
+                <span>•</span>
+                <span>{sizes.length} sizes configured</span>
               </div>
+            </div>
+
+            <div className="ml-2">
+              <StatusChip status={design.status} size="sm" />
             </div>
           </div>
 
-          {/* Navigation & Actions */}
+          {/* Navigation Pager & Delete Slot */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-default-400 font-medium mr-1">
+            <span className="text-xs font-medium text-default-500 whitespace-nowrap px-1">
               {index + 1} of {total}
             </span>
 
@@ -174,6 +178,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
               isDisabled={!prevDesignId}
               onPress={() => prevDesignId && onSelectDesign(prevDesignId)}
               aria-label="Previous design"
+              className="h-9 w-9 rounded-[10px] text-default-600 bg-content3 border border-divider"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -185,57 +190,54 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
               isDisabled={!nextDesignId}
               onPress={() => nextDesignId && onSelectDesign(nextDesignId)}
               aria-label="Next design"
+              className="h-9 w-9 rounded-[10px] text-default-600 bg-content3 border border-divider"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
 
-            <Button
-              size="sm"
-              variant="light"
-              color="danger"
-              startContent={<Trash2 className="w-3.5 h-3.5" />}
-              onPress={onOpenDelete}
-              className="text-xs"
-            >
-              Delete slot
-            </Button>
+            <Tooltip content="Delete this design slot">
+              <Button
+                size="sm"
+                isIconOnly
+                variant="light"
+                color="danger"
+                onPress={onOpenDelete}
+                className="h-9 w-9 rounded-[10px] text-default-400 hover:text-danger ml-1"
+                aria-label="Delete slot"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </Tooltip>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Complete State Alert Banner */}
+      {/* Complete State Alert Banner if ready */}
       {design.status === "complete" && (
-        <Card shadow="sm" className="border border-success-200 bg-success-50/50 dark:bg-success-950/20">
-          <CardBody className="p-3.5 flex flex-row items-center justify-between text-xs text-success-800 dark:text-success-200">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
-              <span>This design has complete data (4 size rows with prices & description).</span>
-            </div>
-            <Button
-              size="sm"
-              variant="flat"
-              color="success"
-              className="font-medium text-xs h-7"
-              onPress={() => {
-                design.status = "needs_json";
-                if (session) setSession({ ...session });
-              }}
-            >
-              Re-edit JSON
-            </Button>
-          </CardBody>
-        </Card>
+        <div className="p-3.5 rounded-[10px] border border-success-200 dark:border-success-900/40 bg-success-50/50 dark:bg-success-950/20 flex flex-row items-center justify-between text-xs text-success-800 dark:text-success-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-success" />
+            <span>This design has complete data ({sizes.length} size rows with prices & description).</span>
+          </div>
+          <Button
+            size="sm"
+            variant="flat"
+            color="success"
+            className="font-medium text-xs h-7 rounded-[8px]"
+            onPress={() => {
+              design.status = "needs_json";
+              if (session) setSession({ ...session });
+            }}
+          >
+            Re-edit JSON
+          </Button>
+        </div>
       )}
 
-      {/* Primary Section: Product JSON Editor */}
-      <Card shadow="sm" className="border border-divider bg-content1">
-        <CardHeader className="px-5 pt-5 pb-2 flex items-center justify-between">
-          <div>
-            <h4 className="text-sm font-semibold text-foreground">Product JSON</h4>
-            <p className="text-xs text-default-400">
-              Paste or edit the product specification JSON for this design
-            </p>
-          </div>
+      {/* 2. Product JSON Editor Card First */}
+      <Card shadow="sm" className="border border-divider bg-content1 rounded-[14px]">
+        <CardHeader className="px-5 pt-4 pb-0 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Product JSON</h3>
         </CardHeader>
         <CardBody className="px-5 pb-5 pt-2">
           {session && (
@@ -253,51 +255,59 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         </CardBody>
       </Card>
 
-      {/* Size Selection Section */}
-      <Card shadow="sm" className="border border-divider bg-content1">
-        <CardBody className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* 3. Sizes Section (All Boxes Equal Dimensions) */}
+      <Card shadow="sm" className="border border-divider bg-content1 rounded-[14px]">
+        <CardBody className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="text-xs font-semibold text-foreground">Brand sizes to generate</div>
-            <div className="text-[11px] text-default-400">
+            <div className="text-sm font-semibold text-foreground">Brand sizes to generate</div>
+            <div className="text-xs text-default-400 mt-0.5">
               Select which sizes to write into the workbook ({sizes.length} rows)
             </div>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+
+          {/* Equal Uniform Size Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
             {BRAND_SIZES.map((s) => {
               const isSelected = sizes.includes(s);
               return (
-                <Chip
+                <button
                   key={s}
-                  variant={isSelected ? "solid" : "bordered"}
-                  color={isSelected ? "primary" : "default"}
-                  size="sm"
-                  className="cursor-pointer select-none font-semibold transition-all"
+                  type="button"
                   onClick={() => handleToggleSize(s)}
+                  aria-pressed={isSelected}
+                  className={`w-11 sm:w-12 h-9 rounded-[10px] border flex items-center justify-center font-semibold text-xs select-none transition-all duration-120 active:scale-95 ${
+                    isSelected
+                      ? "bg-primary text-white border-primary shadow-xs"
+                      : "bg-content2 hover:bg-content3 text-default-600 border-divider hover:border-default-400"
+                  }`}
                 >
                   {s}
-                </Chip>
+                </button>
               );
             })}
+            <span className="text-xs text-default-400 font-medium ml-1">
+              {sizes.length} rows
+            </span>
           </div>
         </CardBody>
       </Card>
 
-      {/* Secondary Section: Brand, Manufacturer & HSN (Collapsed by default) */}
-      <Card shadow="sm" className="border border-divider bg-content1 overflow-hidden">
+      {/* 4. Secondary Section: Brand & HSN (Clean summary row) */}
+      <Card shadow="sm" className="border border-divider bg-content1 rounded-[14px] overflow-hidden">
         <button
           type="button"
           onClick={() => setIsBrandMetaExpanded(!isBrandMetaExpanded)}
-          className="w-full p-4 flex items-center justify-between hover:bg-content2/40 transition-colors text-left focus:outline-none"
+          className="w-full p-4 sm:p-5 flex items-center justify-between hover:bg-content3/50 transition-colors text-left focus:outline-none"
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <Tag className="w-4 h-4 text-default-400" />
             <div>
-              <span className="text-xs font-semibold text-foreground">
+              <span className="text-sm font-semibold text-foreground">
                 Brand & HSN details
               </span>
-              <p className="text-[11px] text-default-400 mt-0.5">
-                Brand: <strong className="text-foreground">{currentBrand}</strong> • HSN:{" "}
-                <strong className="text-foreground">{currentHsn}</strong>
+              <p className="text-xs text-default-400 mt-0.5">
+                Brand: <strong className="text-foreground font-medium">{currentBrand}</strong> • HSN:{" "}
+                <strong className="text-foreground font-medium">{currentHsn}</strong>
               </p>
             </div>
           </div>
@@ -314,13 +324,15 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         </button>
 
         {isBrandMetaExpanded && session && (
-          <div className="p-4 border-t border-divider bg-content2/20">
+          <div className="p-5 border-t border-divider bg-content2/40 transition-all duration-200">
             <BrandMetaEditor
               sessionId={session.session_id}
               design={design}
-              onMetaUpdated={(_meta, rows) => {
-                if (rows && rows.length > 0) {
-                  setPreviewRows(rows);
+              onMetaUpdated={(newMeta) => {
+                if (session) {
+                  if (!session.design_meta) session.design_meta = {};
+                  session.design_meta[design.id] = newMeta;
+                  setSession({ ...session });
                 }
               }}
             />
@@ -328,18 +340,20 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         )}
       </Card>
 
-      {/* Secondary Section: Image Links (Collapsed by default) */}
-      <Card shadow="sm" className="border border-divider bg-content1 overflow-hidden">
+      {/* 5. Secondary Section: Image Links (Clean summary row) */}
+      <Card shadow="sm" className="border border-divider bg-content1 rounded-[14px] overflow-hidden">
         <button
           type="button"
           onClick={() => setIsImagesExpanded(!isImagesExpanded)}
-          className="w-full p-4 flex items-center justify-between hover:bg-content2/40 transition-colors text-left focus:outline-none"
+          className="w-full p-4 sm:p-5 flex items-center justify-between hover:bg-content3/50 transition-colors text-left focus:outline-none"
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <ImageIcon className="w-4 h-4 text-default-400" />
             <div>
-              <span className="text-xs font-semibold text-foreground">Image links</span>
-              <p className="text-[11px] text-default-400 mt-0.5">
+              <span className="text-sm font-semibold text-foreground">
+                Image links
+              </span>
+              <p className="text-xs text-default-400 mt-0.5">
                 {imagesCount}/7 product image links configured
               </p>
             </div>
@@ -357,10 +371,10 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         </button>
 
         {isImagesExpanded && session && (
-          <div className="p-4 border-t border-divider bg-content2/20">
+          <div className="p-5 border-t border-divider bg-content2/40 transition-all duration-200">
             <ImageLinksEditor
-              imageUrls={session?.design_image_edits[design.id] || design.image_urls}
-              productLink={session?.design_product_links[design.id] ?? design.product_link}
+              imageUrls={session.design_image_edits[design.id] || design.image_urls}
+              productLink={session.design_product_links?.[design.id] || design.product_link}
               isManualSlot={design.is_manual_slot}
               onSave={handleSaveImages}
             />
@@ -368,28 +382,31 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         )}
       </Card>
 
-      {/* Row Preview Table */}
+      {/* 6. Live Rows Preview when ready */}
       {previewRows.length > 0 && (
-        <Card shadow="sm" className="border border-divider bg-content1">
-          <CardBody className="p-4">
+        <Card shadow="sm" className="border border-divider bg-content1 rounded-[14px]">
+          <CardHeader className="px-5 pt-4 pb-1">
+            <h3 className="text-sm font-semibold text-foreground">Generated Sheet Rows Preview</h3>
+          </CardHeader>
+          <CardBody className="p-5 pt-2">
             <RowsPreview rows={previewRows} />
           </CardBody>
         </Card>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Slot Confirmation Modal */}
       <Modal isOpen={isDeleteOpen} onOpenChange={onDeleteChange} size="sm">
-        <ModalContent>
+        <ModalContent className="rounded-[14px] border border-divider bg-content1 shadow-xl">
           {(onClose) => (
             <>
-              <ModalHeader className="text-base font-semibold">Delete design slot?</ModalHeader>
-              <ModalBody className="text-sm text-default-600">
-                Are you sure you want to remove #{index + 1}{" "}
-                <strong>{design.base || "Unnamed stub"}</strong>? Any filled JSON and metadata for
-                this slot will be discarded.
+              <ModalHeader className="text-base font-semibold border-b border-divider py-3 px-5">
+                Delete design slot?
+              </ModalHeader>
+              <ModalBody className="text-sm text-default-600 p-5">
+                Are you sure you want to delete <strong>#{index + 1} {design.base || "design"}</strong>? This action will remove it from the session.
               </ModalBody>
-              <ModalFooter>
-                <Button size="sm" variant="light" onPress={onClose}>
+              <ModalFooter className="border-t border-divider py-3 px-5 flex items-center justify-end gap-2">
+                <Button size="sm" variant="light" onPress={onClose} className="rounded-[10px]">
                   Cancel
                 </Button>
                 <Button
@@ -397,6 +414,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
                   color="danger"
                   isLoading={isDeleting}
                   onPress={() => handleDelete(onClose)}
+                  className="rounded-[10px] font-medium"
                 >
                   Delete slot
                 </Button>

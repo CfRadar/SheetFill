@@ -97,7 +97,7 @@ export const LoginPage: React.FC = () => {
       className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-background text-foreground transition-colors duration-200"
       style={{
         background: isDark
-          ? "radial-gradient(circle at 10% 10%, rgba(91, 91, 214, 0.15) 0%, transparent 45%), #0E1016"
+          ? "radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.12) 0%, transparent 45%), #121316"
           : "radial-gradient(circle at 10% 10%, rgba(91, 91, 214, 0.10) 0%, transparent 45%), #F6F7FB",
       }}
     >
