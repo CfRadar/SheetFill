@@ -39,22 +39,16 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 pb-16">
-      {/* Top Navbar */}
-      <header className="bg-slate-900 text-white px-4 py-3 shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center font-black text-sm text-yellow-300">
-              FK
+    <div className="min-h-screen flex flex-col bg-background text-foreground pb-16">
+      {/* Top action header for active session (superseded in Phase 4 by MasterDetail toolbar) */}
+      {session && (
+        <header className="bg-content1 border-b border-divider px-4 py-3 shadow-sm">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold tracking-tight">Active Workbook Session</span>
             </div>
-            <div>
-              <h1 className="text-sm font-bold tracking-tight">Flipkart T-Shirt Listing Automation</h1>
-              <p className="text-[11px] text-slate-400">Zero-corruption surgical .xls workbook generator</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <PromptDropdown />
-            {session && (
+            <div className="flex items-center gap-3">
+              <PromptDropdown />
               <button
                 type="button"
                 onClick={() => {
@@ -64,14 +58,14 @@ export const App: React.FC = () => {
                     window.history.pushState({}, "", window.location.pathname);
                   }
                 }}
-                className="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded border border-slate-700 hover:border-slate-500 transition-colors"
+                className="text-xs text-default-600 hover:text-foreground px-2.5 py-1.5 rounded border border-divider hover:border-default-400 transition-colors"
               >
-                New Sheet
+                New sheet
               </button>
-            )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Global Error Banner */}
       {error && (
