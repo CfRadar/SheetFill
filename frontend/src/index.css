@@ -3,10 +3,39 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-background: #F6F7FB;
+    --surface: #FFFFFF;
+    --surface-raised: #FFFFFF;
+    --surface-subtle: #F0F2F8;
+    --border: #E3E6EF;
+    --border-strong: #CDD2E0;
+    --text: #151824;
+    --text-muted: #5C6378;
+    --text-faint: #8A91A5;
+    --brand-primary: #5B5BD6;
+    --brand-hover: #4B4BC2;
+  }
+
+  .dark {
+    --bg-background: #0E1016;
+    --surface: #151821;
+    --surface-raised: #1B1F2A;
+    --surface-subtle: #1F2430;
+    --border: #2A3040;
+    --border-strong: #3A4256;
+    --text: #E9ECF4;
+    --text-muted: #A0A7BA;
+    --text-faint: #7A8197;
+    --brand-primary: #5B5BD6;
+    --brand-hover: #4B4BC2;
+  }
+
   body {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     @apply bg-background text-foreground antialiased selection:bg-primary-500/20 selection:text-primary-700;
   }
 

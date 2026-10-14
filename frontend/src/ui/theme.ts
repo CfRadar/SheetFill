@@ -6,21 +6,26 @@ const THEME_STORAGE_KEY = "sheetfill_theme_preference";
 
 export const themeTokens = {
   radius: {
-    sm: "rounded-md",
-    md: "rounded-xl",
-    lg: "rounded-2xl",
-    full: "rounded-full",
+    control: "10px",
+    card: "14px",
+    pill: "9999px",
   },
   spacing: {
-    xs: "0.25rem",
-    sm: "0.5rem",
-    md: "1rem",
-    lg: "1.5rem",
-    xl: "2rem",
+    xs: "4px",
+    sm: "8px",
+    md: "12px",
+    base: "16px",
+    lg: "24px",
+    xl: "32px",
+    "2xl": "48px",
   },
   colors: {
-    brandBlue: "#2563eb",
-    brandYellow: "#ffe500",
+    primary: "#5B5BD6",
+    primaryHover: "#4B4BC2",
+    success: "#1FA57A",
+    warning: "#E5A00D",
+    danger: "#E5484D",
+    info: "#3E8FEA",
   },
 };
 
