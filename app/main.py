@@ -122,6 +122,27 @@ async def health_check() -> Dict[str, Any]:
     }
 
 
+# --------------------------------------------------------------------------
+# Public Version Endpoint: /api/version
+# --------------------------------------------------------------------------
+@app.get("/api/version")
+async def get_version() -> Dict[str, Any]:
+    """Public version endpoint returning build metadata and active feature set."""
+    return {
+        "status": "ok",
+        "version": "1.2.0",
+        "commit": "style-code-and-anti-cache-v1.2",
+        "features": [
+            "style_code_autofill_from_sku",
+            "per_product_group_indexing",
+            "global_brand_packer_manufacturer",
+            "strict_download_cache_invalidation",
+            "session_output_auto_reset",
+        ],
+        "server_time": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # Include Routers
 app.include_router(auth_router)
 app.include_router(admin_router)

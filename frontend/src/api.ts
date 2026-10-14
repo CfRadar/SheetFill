@@ -238,11 +238,21 @@ export async function downloadWorkbookFile(
   downloadUrl: string,
   filename?: string
 ): Promise<void> {
-  const url = downloadUrl.startsWith("http")
+  let url = downloadUrl.startsWith("http")
     ? downloadUrl
     : `${API_BASE}${downloadUrl.startsWith("/") ? downloadUrl : `/${downloadUrl}`}`;
 
-  const res = await authFetch(url);
+  // Always append cache-busting timestamp parameter to prevent browser caching
+  const separator = url.includes("?") ? "&" : "?";
+  url = `${url}${separator}_cb=${Date.now()}`;
+
+  const res = await authFetch(url, {
+    cache: "no-store",
+    headers: {
+      "Pragma": "no-cache",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+    },
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(

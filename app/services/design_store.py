@@ -111,6 +111,11 @@ class DesignStore:
         state.summary.partial = partial
         state.summary.complete = complete
 
+    def _invalidate_generated_output(self, state: SessionState) -> None:
+        """Clears previously generated output file and report whenever inputs are modified."""
+        state.output_filename = None
+        state.report = None
+
     def add_slots(self, session_id: str, count: int, user_id: Optional[str] = None) -> Optional[SessionState]:
         """Appends manual stub designs to the session."""
         state = self.get_session(session_id, user_id=user_id)
@@ -146,6 +151,7 @@ class DesignStore:
             state.designs.append(new_design)
 
         self.update_summary(state)
+        self._invalidate_generated_output(state)
         self.save_session(state)
         return state
 
@@ -176,6 +182,7 @@ class DesignStore:
         state.design_meta.pop(design_id, None)
 
         self.update_summary(state)
+        self._invalidate_generated_output(state)
         self.save_session(state)
         return True
 
@@ -212,6 +219,7 @@ class DesignStore:
                 break
 
         self.update_summary(state)
+        self._invalidate_generated_output(state)
         self.save_session(state)
         return state
 
@@ -246,6 +254,7 @@ class DesignStore:
                     d.product_link = product_link
                 break
 
+        self._invalidate_generated_output(state)
         self.save_session(state)
         return state
 
@@ -267,6 +276,7 @@ class DesignStore:
                 d.sizes_found = sizes
                 break
 
+        self._invalidate_generated_output(state)
         self.save_session(state)
         return state
 
@@ -296,6 +306,7 @@ class DesignStore:
             cur["hsn"] = hsn.strip()
         state.design_meta[design_id] = cur
 
+        self._invalidate_generated_output(state)
         self.save_session(state)
         return state
 
@@ -329,6 +340,7 @@ class DesignStore:
             cur.update(meta)
             state.design_meta[d.id] = cur
 
+        self._invalidate_generated_output(state)
         self.save_session(state)
         return state
 

@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any, Dict, List, Optional, Set
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
@@ -145,7 +146,11 @@ def get_session_state(sid: str, user: CurrentUser = Depends(require_user)) -> An
         if changed:
             store.save_session(session)
 
-    download_url = f"/api/sheets/{sid}/download" if session.output_filename else None
+    download_url = (
+        f"/api/sheets/{sid}/download?t={int(session.updated_at)}"
+        if session.output_filename
+        else None
+    )
 
     return SessionResponse(
         session_id=session.session_id,
@@ -747,7 +752,7 @@ async def generate_workbook(
         meta={"mode": req.mode, "output_filename": out_filename, "rows_count": rows_count},
     )
 
-    download_url = f"/api/sheets/{sid}/download"
+    download_url = f"/api/sheets/{sid}/download?t={int(time.time())}"
     return GenerateResponse(download_url=download_url, report=report, filename=out_filename)
 
 
@@ -774,8 +779,15 @@ async def download_workbook(
         meta={"filename": session.output_filename},
     )
 
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+
     return FileResponse(
         path=str(fpath),
         filename=session.output_filename,
         media_type="application/vnd.ms-excel",
+        headers=headers,
     )

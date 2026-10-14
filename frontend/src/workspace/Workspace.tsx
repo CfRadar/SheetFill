@@ -36,6 +36,13 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
     }
   }, [session, activeDesignId]);
 
+  // If session output is invalidated due to edits, dismiss stale download banner
+  useEffect(() => {
+    if (!session?.download_url && downloadInfo) {
+      setDownloadInfo(null);
+    }
+  }, [session?.download_url, downloadInfo]);
+
   if (!session) return null;
 
   const { designs, design_sizes } = session;

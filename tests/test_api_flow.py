@@ -46,7 +46,7 @@ def test_api_full_flow_compare_with_2_final():
     assert resp.status_code == 200
     gen_data = resp.json()
     download_url = gen_data["download_url"]
-    assert download_url == f"/api/sheets/{sid}/download"
+    assert download_url.startswith(f"/api/sheets/{sid}/download")
 
     # 5. Download generated workbook
     resp = client.get(download_url)
