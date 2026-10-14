@@ -55,16 +55,22 @@ app = FastAPI(
 )
 
 # CORS middleware
-origins = [settings.frontend_origin]
-if settings.env == "development":
-    origins.extend(["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"])
+raw_origins = [o.strip().rstrip("/") for o in settings.frontend_origin.split(",") if o.strip()]
+default_origins = [
+    "https://sheet-fill-snowy.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+]
+origins = list(dict.fromkeys(raw_origins + default_origins))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_headers=["*"],
 )
 
 

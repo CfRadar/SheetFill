@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { API_BASE } from "../config";
 
 export interface CurrentUser {
   id: string;
@@ -114,7 +115,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (username: string, password: string) => {
     set({ isLoading: true, errorNotice: null });
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -162,7 +163,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const token = get().token;
     if (token) {
       try {
-        await fetch("/api/auth/logout", {
+        await fetch(`${API_BASE}/api/auth/logout`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -182,7 +183,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (!token) return false;
 
     try {
-      const res = await fetch("/api/auth/me", {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

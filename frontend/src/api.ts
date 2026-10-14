@@ -5,8 +5,10 @@ import {
   SessionState,
 } from "./types";
 import { useAuthStore } from "./auth/authStore";
+import { API_BASE } from "./config";
 
-const BASE_URL = "/api";
+export { API_BASE };
+const BASE_URL = `${API_BASE}/api`;
 
 /**
  * Transparent fetch wrapper with authentication header injection,

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { API_BASE } from "../config";
 
 export type WakeStatus = "checking" | "waking" | "ready" | "failed";
 
@@ -16,7 +17,7 @@ export function useServerWake(): ServerWakeState {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
-      const res = await fetch("/api/health", {
+      const res = await fetch(`${API_BASE}/api/health`, {
         signal: controller.signal,
         cache: "no-store",
       });
