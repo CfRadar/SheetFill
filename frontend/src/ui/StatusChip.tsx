@@ -29,6 +29,7 @@ export const StatusChip: React.FC<StatusChipProps> = ({
 
   switch (norm) {
     case "ready":
+    case "complete":
       return (
         <Chip
           size={size}
@@ -37,7 +38,20 @@ export const StatusChip: React.FC<StatusChipProps> = ({
           startContent={<CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
           className={`font-semibold ${className}`}
         >
-          {customLabel || "Ready"}
+          {customLabel || (norm === "complete" ? "Complete" : "Ready")}
+        </Chip>
+      );
+
+    case "partial":
+      return (
+        <Chip
+          size={size}
+          color="warning"
+          variant="flat"
+          startContent={<Clock className="w-3.5 h-3.5 shrink-0" />}
+          className={`font-semibold ${className}`}
+        >
+          {customLabel || "Partial"}
         </Chip>
       );
 
