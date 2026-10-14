@@ -366,15 +366,19 @@ def build_design_rows(
             warnings.append(desc_w)
 
     # Key Features
-    kf_input = json_data.get("key_features")
-    if isinstance(kf_input, list):
-        key_features_str = "::".join([str(k).strip() for k in kf_input if str(k).strip()])
-    elif isinstance(kf_input, str):
-        key_features_str = kf_input.strip()
-    elif design.existing_values.get("BO"):
-        key_features_str = str(design.existing_values["BO"]).strip()
+    kf_sheet = json_data.get("key_features_sheet")
+    if kf_sheet:
+        key_features_str = str(kf_sheet).strip()
     else:
-        key_features_str = ""
+        kf_input = json_data.get("key_features")
+        if isinstance(kf_input, list):
+            key_features_str = "::".join([str(k).strip() for k in kf_input if str(k).strip()])
+        elif isinstance(kf_input, str):
+            key_features_str = kf_input.strip()
+        elif design.existing_values.get("BO"):
+            key_features_str = str(design.existing_values["BO"]).strip()
+        else:
+            key_features_str = ""
 
     # Search Keywords
     sk_input = json_data.get("search_keywords")
@@ -425,6 +429,16 @@ def build_design_rows(
     # default ["S"], or "all", or list of sizes
     dp_val = json_data.get("detail_placement") or design.existing_values.get("BD") or defaults.get("detail_placement", "Front Panel")
     dp_rows = json_data.get("detail_placement_rows", ["S"])
+
+    # Stylings and details from JSON or existing stub
+    surface_styling_val = (
+        json_data.get("surface_styling")
+        or design.existing_values.get("BJ")
+        or ("Typography" if "typography" in desc_val.lower() else "None")
+    )
+    print_coverage_val = json_data.get("print_coverage") or design.existing_values.get("BE") or defaults.get("print_coverage", "Chest")
+    tee_length_val = json_data.get("tee_length") or design.existing_values.get("BF") or defaults.get("tee_length", "Medium")
+    sleeve_details_val = json_data.get("sleeve_details") or design.existing_values.get("BK") or defaults.get("sleeve_details", "No Details")
 
     # If errors found, return status invalid
     if errors:
@@ -500,12 +514,12 @@ def build_design_rows(
             "AR": size,
             "AS": mapped_color,
             "AT": brand_color_val,
-            "BE": str(design.existing_values.get("BE", defaults.get("print_coverage", "Chest"))),
-            "BF": str(design.existing_values.get("BF", defaults.get("tee_length", "Medium"))),
+            "BE": str(print_coverage_val),
+            "BF": str(tee_length_val),
             "BG": str(design.existing_values.get("BG", defaults.get("reversible", "No"))),
             "BH": fabric_care_str,
-            "BJ": str(design.existing_values.get("BJ", "Typography" if "typography" in desc_val.lower() else "None")),
-            "BK": str(design.existing_values.get("BK", defaults.get("sleeve_details", "No Details"))),
+            "BJ": str(surface_styling_val),
+            "BK": str(sleeve_details_val),
             "BM": desc_val,
             "BN": search_keywords_str,
             "BO": key_features_str,
