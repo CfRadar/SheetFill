@@ -36,7 +36,7 @@ help:
 venv:
 	@if [ ! -d "$(VENV)" ]; then \
 		echo "Creating virtual environment in $(VENV)..."; \
-		python -m venv $(VENV) || python3 -m venv $(VENV); \
+		python -m venv $(VENV) || python3 -m venv $(VENV) || py -m venv $(VENV); \
 		$(PYTHON) -m pip install -q --upgrade pip; \
 		$(PYTHON) -m pip install -q -r requirements.txt; \
 		$(PYTHON) -m pip install -q -e .; \
@@ -52,7 +52,7 @@ backend: venv
 	@echo "API URL: http://$(HOST):$(PORT)"
 	@echo "Docs:    http://$(HOST):$(PORT)/docs"
 	@echo "======================================================="
-	$(ACTIVATE) && $(PYTHON) -m uvicorn app.main:app --host $(HOST) --port $(PORT) --reload
+	$(PYTHON) -m uvicorn app.main:app --host $(HOST) --port $(PORT) --reload
 
 frontend:
 	@if [ ! -d "frontend/node_modules" ]; then \
@@ -82,11 +82,11 @@ run: venv
 	@echo "======================================================="
 	@echo "Starting Unified App on http://$(HOST):$(PORT)..."
 	@echo "======================================================="
-	$(ACTIVATE) && $(PYTHON) -m uvicorn app.main:app --host $(HOST) --port $(PORT)
+	$(PYTHON) -m uvicorn app.main:app --host $(HOST) --port $(PORT)
 
 test: venv
 	@echo "Running tests with pytest..."
-	$(ACTIVATE) && $(PYTEST) -v
+	$(PYTEST) -v
 
 clean:
 	@echo "Cleaning up build artifacts and caches..."
