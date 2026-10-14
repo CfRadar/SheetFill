@@ -2,8 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@layer base {
+  body {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    @apply bg-background text-foreground antialiased selection:bg-primary-500/20 selection:text-primary-700;
+  }
+
+  /* Smooth 200ms theme color transition */
+  html {
+    transition: background-color 200ms ease-out, color 200ms ease-out;
+  }
+
+  /* Micro-scale interaction on all standard buttons */
+  button:not([disabled]):active {
+    transform: scale(0.98);
+  }
+}
+
+/* Reduced motion accessibility compliance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+    transform: none !important;
+  }
 }

@@ -1,7 +1,19 @@
 import React, { useState } from "react";
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
+  Chip,
+  Textarea,
+} from "@heroui/react";
+import { Sparkles, ClipboardPaste } from "lucide-react";
 import { bulkAssignJson, confirmBulkAssign } from "../api";
 import { useAppStore } from "../store";
-import { BulkAssignResponse, MatchAssignment } from "../types";
+import { BulkAssignResponse } from "../types";
+import { toast } from "../ui/ToastProvider";
 
 interface BulkPasteDialogProps {
   isOpen: boolean;
@@ -15,7 +27,7 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
   const [manualPairs, setManualPairs] = useState<Record<number, string>>({});
   const [isProcessing, setIsProcessing] = useState(false);
 
-  if (!isOpen || !session) return null;
+  if (!session) return null;
 
   const handleMatch = async () => {
     if (!rawText.trim()) return;
@@ -23,9 +35,7 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
       setIsProcessing(true);
       const res = await bulkAssignJson(session.session_id, rawText);
       setMatchResult(res);
-      // Prepopulate manual assignments for unmatched
-      const initManual: Record<number, string> = {};
-      setManualPairs(initManual);
+      setManualPairs({});
     } catch (err: any) {
       setError(err?.message || "Failed to process bulk JSON");
     } finally {
@@ -65,7 +75,10 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
 
       const updated = await confirmBulkAssign(session.session_id, pairs);
       setSession(updated);
+      toast.success(`Applied JSON specifications to ${pairs.length} design slots.`);
       onClose();
+      setMatchResult(null);
+      setRawText("");
     } catch (err: any) {
       setError(err?.message || "Failed to apply matched JSON");
     } finally {
@@ -73,162 +86,184 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
     }
   };
 
+  const handleClose = () => {
+    setMatchResult(null);
+    setRawText("");
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-slate-800">Paste All Product JSONs</h3>
-            <span className="text-xs bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-full">
-              Multi-Design Matching
-            </span>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onOpenChange={(open) => !open && handleClose()}
+      size="3xl"
+      backdrop="blur"
+      scrollBehavior="inside"
+    >
+      <ModalContent>
+        {() => (
+          <>
+            <ModalHeader className="flex items-center justify-between gap-3 border-b border-divider py-3.5 px-6">
+              <div className="flex items-center gap-2">
+                <ClipboardPaste className="w-5 h-5 text-primary" />
+                <h3 className="text-base font-bold text-foreground">Paste all product JSONs</h3>
+              </div>
+              <Chip size="sm" variant="flat" color="primary" className="font-medium text-xs">
+                Multi-design matching
+              </Chip>
+            </ModalHeader>
 
-        {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-4 flex-1">
-          {!matchResult ? (
-            <div>
-              <p className="text-xs text-slate-500 mb-2">
-                Paste a JSON array <code>[&#123;...&#125;, &#123;...&#125;]</code> or several JSON objects pasted back-to-back.
-                The matcher will automatically correlate them with the detected designs by SKU base, title, or style code.
-              </p>
-              <textarea
-                data-testid="bulk-json-textarea"
-                rows={14}
-                value={rawText}
-                onChange={(e) => setRawText(e.target.value)}
-                placeholder='[\n  {\n    "sku_base": "tintin_os",\n    "product_title": "...",\n    ...\n  },\n  ...\n]'
-                className="w-full font-mono text-xs p-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-700">
-                  Matching Results ({matchResult.assigned.length} matched, {matchResult.unmatched_json.length} unmatched JSONs)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setMatchResult(null)}
-                  className="text-blue-600 hover:underline"
+            <ModalBody className="p-6">
+              {!matchResult ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-default-500">
+                    Paste a JSON array <code>[{`{...}`}, {`{...}`}]</code> or multiple JSON objects.
+                    The matcher correlates them automatically with your workbook designs by SKU base or title.
+                  </p>
+                  <Textarea
+                    data-testid="bulk-json-textarea"
+                    minRows={12}
+                    maxRows={20}
+                    value={rawText}
+                    onChange={(e) => setRawText(e.target.value)}
+                    placeholder='[\n  {\n    "sku_base": "classic_polo_black",\n    "product_title": "Men Solid Polo...",\n    ...\n  }\n]'
+                    variant="bordered"
+                    className="font-mono text-xs"
+                    aria-label="Bulk JSON input"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground">
+                      Matching results ({matchResult.assigned.length} matched,{" "}
+                      {matchResult.unmatched_json.length} unmatched)
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      color="primary"
+                      onPress={() => setMatchResult(null)}
+                      className="text-xs h-7"
+                    >
+                      Edit raw JSON
+                    </Button>
+                  </div>
+
+                  {/* Assignments Table */}
+                  <div className="border border-divider rounded-xl overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                      <thead className="bg-content2/60 border-b border-divider text-default-600 font-semibold">
+                        <tr>
+                          <th className="p-3">JSON Title / Base</th>
+                          <th className="p-3">Matched Design Slot</th>
+                          <th className="p-3">Method</th>
+                          <th className="p-3">Confidence</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-divider">
+                        {matchResult.assigned.map((a, i) => (
+                          <tr key={i} className="hover:bg-content2/40 transition-colors">
+                            <td className="p-3 font-medium text-foreground">
+                              {a.json_base || a.parsed_json?.product_title || `#${a.json_index + 1}`}
+                            </td>
+                            <td className="p-3 font-bold text-primary">
+                              {a.design_base || a.design_id}
+                            </td>
+                            <td className="p-3">
+                              <Chip
+                                size="sm"
+                                variant="flat"
+                                color={
+                                  a.how === "exact"
+                                    ? "success"
+                                    : a.how === "normalized" || a.how === "suffix"
+                                    ? "primary"
+                                    : "warning"
+                                }
+                                className="text-[11px] font-semibold"
+                              >
+                                {a.how}
+                              </Chip>
+                            </td>
+                            <td className="p-3 text-default-500 font-mono">
+                              {Math.round(a.confidence * 100)}%
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* Unmatched JSON items */}
+                        {matchResult.unmatched_json.map((u) => (
+                          <tr key={u.json_index} className="bg-danger-50/20 dark:bg-danger-950/20">
+                            <td className="p-3 font-medium text-danger">
+                              {u.parsed_json?.sku_base ||
+                                u.parsed_json?.product_title ||
+                                `JSON #${u.json_index + 1}`}
+                            </td>
+                            <td className="p-3" colSpan={3}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] text-danger font-medium whitespace-nowrap">
+                                  Unmatched. Assign to:
+                                </span>
+                                <select
+                                  value={manualPairs[u.json_index] || ""}
+                                  onChange={(e) =>
+                                    setManualPairs({
+                                      ...manualPairs,
+                                      [u.json_index]: e.target.value,
+                                    })
+                                  }
+                                  className="text-xs p-1.5 rounded-lg border border-divider bg-content1 text-foreground"
+                                >
+                                  <option value="">-- Choose Design Slot --</option>
+                                  {session.designs.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                      {d.id}: {d.base || "Unnamed"}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </ModalBody>
+
+            <ModalFooter className="border-t border-divider py-3 px-6 flex items-center justify-between">
+              <Button size="sm" variant="light" onPress={handleClose}>
+                Cancel
+              </Button>
+              {!matchResult ? (
+                <Button
+                  size="sm"
+                  color="primary"
+                  isLoading={isProcessing}
+                  isDisabled={!rawText.trim()}
+                  startContent={!isProcessing && <Sparkles className="w-3.5 h-3.5" />}
+                  onPress={handleMatch}
+                  className="font-semibold"
                 >
-                  Edit raw JSON
-                </button>
-              </div>
-
-              {/* Assignments Table */}
-              <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                    <tr>
-                      <th className="p-2.5">JSON Title / Base</th>
-                      <th className="p-2.5">Matched Design Slot</th>
-                      <th className="p-2.5">Method</th>
-                      <th className="p-2.5">Confidence</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {matchResult.assigned.map((a, i) => (
-                      <tr key={i} className="hover:bg-slate-50/50">
-                        <td className="p-2.5 font-medium text-slate-800">
-                          {a.json_base || a.parsed_json?.product_title || `#${a.json_index + 1}`}
-                        </td>
-                        <td className="p-2.5 font-bold text-blue-700">
-                          {a.design_base || a.design_id}
-                        </td>
-                        <td className="p-2.5">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                              a.how === "exact"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : a.how === "normalized" || a.how === "suffix"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-amber-100 text-amber-800"
-                            }`}
-                          >
-                            {a.how}
-                          </span>
-                        </td>
-                        <td className="p-2.5 text-slate-500">
-                          {Math.round(a.confidence * 100)}%
-                        </td>
-                      </tr>
-                    ))}
-
-                    {/* Unmatched JSON items */}
-                    {matchResult.unmatched_json.map((u) => (
-                      <tr key={u.json_index} className="bg-red-50/30">
-                        <td className="p-2.5 font-medium text-red-800">
-                          {u.parsed_json?.sku_base || u.parsed_json?.product_title || `JSON #${u.json_index + 1}`}
-                        </td>
-                        <td className="p-2.5" colSpan={3}>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-red-600 font-medium">Unmatched. Assign to:</span>
-                            <select
-                              value={manualPairs[u.json_index] || ""}
-                              onChange={(e) =>
-                                setManualPairs({
-                                  ...manualPairs,
-                                  [u.json_index]: e.target.value,
-                                })
-                              }
-                              className="text-xs p-1 rounded border border-slate-300 bg-white"
-                            >
-                              <option value="">-- Choose Design Slot --</option>
-                              {session.designs.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                  {d.id}: {d.base || "Unnamed"}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
-          >
-            Cancel
-          </button>
-          {!matchResult ? (
-            <button
-              type="button"
-              onClick={handleMatch}
-              disabled={isProcessing || !rawText.trim()}
-              className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
-            >
-              {isProcessing ? "Matching..." : "Match JSONs to Designs"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={isProcessing}
-              className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors disabled:opacity-50"
-            >
-              {isProcessing ? "Applying..." : "Confirm & Save All"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+                  Analyze & match
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  color="success"
+                  isLoading={isProcessing}
+                  onPress={handleConfirm}
+                  className="font-semibold text-white shadow-sm"
+                >
+                  Apply all matches
+                </Button>
+              )}
+            </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   );
 };
