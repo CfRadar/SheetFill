@@ -99,6 +99,8 @@ export const AdminDashboard: React.FC = () => {
     days: number;
   } | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [customExtendUser, setCustomExtendUser] = useState<any | null>(null);
+  const [customExtendDays, setCustomExtendDays] = useState<number>(30);
 
   // Action Confirmation Modal State
   const {
@@ -669,6 +671,10 @@ export const AdminDashboard: React.FC = () => {
                               if (key === "ext-7") handleExtend(u.id, "7");
                               if (key === "ext-30") handleExtend(u.id, "30");
                               if (key === "ext-90") handleExtend(u.id, "90");
+                              if (key === "ext-custom") {
+                                setCustomExtendUser(u);
+                                setCustomExtendDays(30);
+                              }
                               if (key === "logout") promptForceLogout(u);
                               if (key === "toggle-status") promptToggleActive(u);
                               if (key === "delete") promptDeleteUser(u);
@@ -677,6 +683,7 @@ export const AdminDashboard: React.FC = () => {
                             <DropdownItem key="ext-7">Add 7 days access</DropdownItem>
                             <DropdownItem key="ext-30">Add 30 days access</DropdownItem>
                             <DropdownItem key="ext-90">Add 90 days access</DropdownItem>
+                            <DropdownItem key="ext-custom">Add custom days...</DropdownItem>
                             <DropdownItem key="logout">Force logout devices</DropdownItem>
                             <DropdownItem key="toggle-status">
                               {u.is_active ? "Suspend account" : "Enable account"}
@@ -927,10 +934,15 @@ export const AdminDashboard: React.FC = () => {
                     />
 
                     <div>
-                      <span className="text-xs font-medium text-foreground block mb-1.5">
-                        Access duration
-                      </span>
-                      <div className="grid grid-cols-5 gap-1.5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-foreground">
+                          Access duration
+                        </span>
+                        <span className="text-[11px] text-default-400 font-mono">
+                          {newDurationDays > 0 ? `${newDurationDays} days` : "Custom"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1.5 mb-2.5">
                         {[7, 30, 90, 180, 365].map((d) => (
                           <Button
                             key={d}
@@ -938,11 +950,33 @@ export const AdminDashboard: React.FC = () => {
                             variant={newDurationDays === d ? "solid" : "flat"}
                             color={newDurationDays === d ? "primary" : "default"}
                             onPress={() => setNewDurationDays(d)}
-                            className="font-semibold text-xs"
+                            className="font-semibold text-xs rounded-[8px]"
                           >
                             {d}d
                           </Button>
                         ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-default-400 whitespace-nowrap">Or custom:</span>
+                        <Input
+                          type="number"
+                          size="sm"
+                          min={1}
+                          max={3650}
+                          placeholder="e.g. 15, 45, 60"
+                          value={newDurationDays > 0 ? String(newDurationDays) : ""}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (!isNaN(val)) {
+                              setNewDurationDays(Math.max(1, Math.min(val, 3650)));
+                            } else {
+                              setNewDurationDays(0);
+                            }
+                          }}
+                          endContent={<span className="text-xs text-default-400">days</span>}
+                          className="flex-1"
+                          aria-label="Custom access duration in days"
+                        />
                       </div>
                     </div>
 
@@ -975,6 +1009,108 @@ export const AdminDashboard: React.FC = () => {
                     Confirm & issue
                   </Button>
                 )}
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL: CUSTOM EXTENSION */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={!!customExtendUser}
+        onOpenChange={(open) => !open && setCustomExtendUser(null)}
+        size="sm"
+        backdrop="blur"
+        classNames={{
+          base: "rounded-[14px] border border-divider bg-content1 shadow-xl",
+          header: "border-b border-divider py-4 px-6",
+          body: "p-6 space-y-4",
+          footer: "border-t border-divider py-3.5 px-6",
+        }}
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-[8px] bg-primary/10 flex items-center justify-center text-primary">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Extend access</h3>
+                  <p className="text-xs text-default-400 font-normal">
+                    @{customExtendUser?.username} ({customExtendUser?.display_name || "Subscriber"})
+                  </p>
+                </div>
+              </ModalHeader>
+
+              <ModalBody>
+                <div className="space-y-3.5">
+                  <div>
+                    <span className="text-xs font-medium text-foreground block mb-1.5">
+                      Quick presets
+                    </span>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[7, 14, 30, 60, 90].map((d) => (
+                        <Button
+                          key={d}
+                          size="sm"
+                          variant={customExtendDays === d ? "solid" : "flat"}
+                          color={customExtendDays === d ? "primary" : "default"}
+                          onPress={() => setCustomExtendDays(d)}
+                          className="font-semibold text-xs rounded-[8px]"
+                        >
+                          +{d}d
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-xs font-medium text-foreground block mb-1.5">
+                      Custom days to add
+                    </span>
+                    <Input
+                      type="number"
+                      size="sm"
+                      min={1}
+                      max={3650}
+                      placeholder="e.g. 15, 45, 120"
+                      value={customExtendDays > 0 ? String(customExtendDays) : ""}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) {
+                          setCustomExtendDays(Math.max(1, Math.min(val, 3650)));
+                        } else {
+                          setCustomExtendDays(0);
+                        }
+                      }}
+                      endContent={<span className="text-xs text-default-400">days</span>}
+                      aria-label="Custom days to extend"
+                    />
+                  </div>
+                </div>
+              </ModalBody>
+
+              <ModalFooter className="flex items-center justify-end gap-2">
+                <Button size="sm" variant="light" onPress={onClose} className="rounded-[10px] text-xs">
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  color="primary"
+                  isDisabled={!customExtendDays || customExtendDays <= 0}
+                  onPress={async () => {
+                    if (customExtendUser && customExtendDays > 0) {
+                      await handleExtend(customExtendUser.id, String(customExtendDays));
+                      onClose();
+                    }
+                  }}
+                  className="rounded-[10px] text-xs font-semibold px-4 h-9"
+                >
+                  Add {customExtendDays || 0} days
+                </Button>
               </ModalFooter>
             </>
           )}

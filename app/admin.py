@@ -61,7 +61,7 @@ class UpdateUserRequest(BaseModel):
     display_name: Optional[str] = Field(None, max_length=64)
     is_active: Optional[bool] = None
     notes: Optional[str] = Field(None, max_length=500)
-    extension: Optional[str] = Field(None, pattern=r"^\+(7d|30d|90d|180d|365d)$")
+    extension: Optional[str] = Field(None, pattern=r"^\+([1-9]\d*)d$")
     access_expires_at: Optional[datetime] = None
 
 
