@@ -36,8 +36,24 @@ The startup script will automatically:
 
 ---
 
+## 2. Visual Design System & UI Architecture
 
-## 2. Web Application Workflow
+The frontend is built on **HeroUI v2** with **Tailwind CSS**, designed according to workspace guidelines (`sheetfill-design-system` and `sheetfill-frontend-ux`):
+
+- **Warm Minimalist Palette**:
+  - Light mode: crisp porcelain canvas (`#F6F7FB`) with white cards (`#FFFFFF`) and slate dividers (`#E3E6EF`).
+  - Dark mode: warm charcoal canvas (`#121316`) with warm slate cards (`#18191D`), raised surfaces (`#202126`), and soft gray dividers (`#2E3037`).
+  - Brand Accent: warm indigo (`#6366F1`) with WCAG-compliant 4.5:1+ contrast across all text.
+- **Strictly Equal Control Dimensions**:
+  - Size selection chips are standardized to **uniform `44px`–`48px` × `36px`** dimension boxes (`rounded-[10px]`) for clean visual symmetry.
+  - Form inputs (`40px`), toolbar actions (`36px`), and admin stat cards (`20px` padding with `44px` icon containers) share unified geometric tokens.
+- **Motion Spec**:
+  - Purposeful `120ms` micro-interactions, `200ms` view crossfades (`<PageFade>`), and `280ms` modal/drawer entrances.
+  - Full `@media (prefers-reduced-motion: reduce)` compliance.
+- **Visual Acceptance**:
+  - Fully audited and screenshot-verified across `1440px`, `1024px`, and `390px` viewports in both light and dark themes in `docs/ui-fix/visual-acceptance-report.md`.
+
+---
 
 The web app allows you to upload partially-filled or draft listing sheets, correlates designs with product JSONs, and generates complete `.xlsm` workbooks ready for the Flipkart Seller Portal.
 
