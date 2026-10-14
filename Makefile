@@ -8,14 +8,16 @@ ifeq ($(OS),Windows_NT)
 	PYTHON ?= $(BIN)/python.exe
 	UVICORN ?= $(BIN)/uvicorn.exe
 	PYTEST ?= $(BIN)/pytest.exe
-	ACTIVATE ?= . $(BIN)/activate
+	NPM ?= npm.cmd
+	NPX ?= npx.cmd
 else
 	VENV ?= .venv
 	BIN ?= $(VENV)/bin
 	PYTHON ?= $(BIN)/python
 	UVICORN ?= $(BIN)/uvicorn
 	PYTEST ?= $(BIN)/pytest
-	ACTIVATE ?= . $(BIN)/activate
+	NPM ?= npm
+	NPX ?= npx
 endif
 
 HOST ?= 127.0.0.1
@@ -44,7 +46,7 @@ venv:
 
 install: venv
 	@echo "Installing frontend npm packages..."
-	cd frontend && npm install
+	cd frontend && $(NPM) install
 
 backend: venv
 	@echo "======================================================="
@@ -57,22 +59,22 @@ backend: venv
 frontend:
 	@if [ ! -d "frontend/node_modules" ]; then \
 		echo "Installing frontend dependencies..."; \
-		(cd frontend && npm install); \
+		(cd frontend && $(NPM) install); \
 	fi
 	@echo "======================================================="
 	@echo "Starting Vite Frontend Dev Server..."
 	@echo "UI URL: http://localhost:3000"
 	@echo "Proxy:  http://localhost:3000/api -> http://$(HOST):$(PORT)"
 	@echo "======================================================="
-	cd frontend && npm run dev
+	cd frontend && $(NPM) run dev
 
 build:
 	@echo "Building frontend static assets into frontend/dist..."
 	@if [ ! -d "frontend/node_modules" ]; then \
 		echo "Installing frontend dependencies..."; \
-		(cd frontend && npm install); \
+		(cd frontend && $(NPM) install); \
 	fi
-	cd frontend && npm run build
+	cd frontend && $(NPM) run build
 
 run: venv
 	@if [ ! -f "frontend/dist/index.html" ]; then \
