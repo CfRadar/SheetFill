@@ -13,6 +13,10 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
   useDisclosure,
 } from "@heroui/react";
 import {
@@ -21,6 +25,8 @@ import {
   Plus,
   Download,
   RotateCcw,
+  MoreHorizontal,
+  Layers,
 } from "lucide-react";
 import { addSlots, generateWorkbook } from "../api";
 import { useAppStore } from "../store";
@@ -96,16 +102,17 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-content1/95 backdrop-blur-md border-b border-divider px-4 py-2.5 shadow-xs transition-colors">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          {/* Left: Workbook chip, design count & progress */}
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-30 bg-content1 border-b border-divider px-4 sm:px-6 py-2 shadow-xs transition-colors">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+          {/* Left section: Drawer toggle (mobile), Workbook chip, ready progress */}
+          <div className="flex items-center gap-3 min-w-0">
             {onToggleMobileDrawer && (
               <Button
                 size="sm"
                 variant="flat"
-                className="lg:hidden"
+                className="lg:hidden h-9 px-3 rounded-[10px] text-xs font-medium"
                 onPress={onToggleMobileDrawer}
+                startContent={<Layers className="w-3.5 h-3.5 text-primary" />}
               >
                 Designs ({totalCount})
               </Button>
@@ -116,103 +123,147 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
               color="default"
               size="sm"
               startContent={<FileSpreadsheet className="w-3.5 h-3.5 shrink-0 ml-1 text-primary" />}
-              className="max-w-[180px] sm:max-w-xs font-medium truncate"
+              className="hidden sm:inline-flex h-7 text-xs font-medium max-w-xs truncate border border-divider"
             >
               {filename}
             </Chip>
 
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-divider">
-              <Progress
-                size="sm"
-                value={percentReady}
-                color={readyCount === totalCount ? "success" : "primary"}
-                aria-label="Design readiness progress"
-                className="w-24 md:w-32"
-              />
-              <span className="text-xs font-semibold text-foreground whitespace-nowrap">
+            <div className="hidden md:flex items-center gap-2.5 pl-3 border-l border-divider">
+              <span className="text-xs font-medium text-default-600 whitespace-nowrap">
                 {readyCount} of {totalCount} ready
               </span>
+              <div className="w-40 h-1 bg-default-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300 ease-out"
+                  style={{ width: `${percentReady}%` }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Right: Actions & Primary Generate Button */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <Button
-              size="sm"
-              variant="flat"
-              color="primary"
-              startContent={<ClipboardPaste className="w-3.5 h-3.5" />}
-              onPress={onOpenBulkPaste}
-              className="font-medium"
-            >
-              Paste all JSON
-            </Button>
+          {/* Right section: Toolbar actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Desktop Actions (>= 1024px) */}
+            <div className="hidden lg:flex items-center gap-2">
+              {/* Secondary button: Paste all JSON */}
+              <Button
+                size="sm"
+                variant="flat"
+                color="default"
+                startContent={<ClipboardPaste className="w-3.5 h-3.5 text-default-500" />}
+                onPress={onOpenBulkPaste}
+                className="h-9 px-3.5 rounded-[10px] font-medium text-xs text-foreground bg-content3 hover:bg-default-200 border border-divider transition-colors"
+              >
+                Paste all JSON
+              </Button>
 
-            <PromptDropdown />
+              {/* Secondary button: Prompt */}
+              <PromptDropdown />
 
-            {/* Add Slots Popover */}
-            <Popover
-              isOpen={isPopoverOpen}
-              onOpenChange={setIsPopoverOpen}
-              placement="bottom-end"
-              showArrow
-            >
-              <PopoverTrigger>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  startContent={<Plus className="w-3.5 h-3.5" />}
-                  className="font-medium"
-                >
-                  Add slots
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="p-3 w-56">
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold text-foreground">
-                    Add empty design slots
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      size="sm"
-                      min={1}
-                      max={summary?.room_for_new_designs || 20}
-                      value={String(slotCount)}
-                      onChange={(e) => setSlotCount(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-20"
-                      aria-label="Slots count"
-                    />
-                    <Button
-                      size="sm"
-                      color="primary"
-                      isLoading={isAdding}
-                      onPress={handleAddSlots}
-                      className="flex-1 font-medium"
-                    >
-                      Add
-                    </Button>
+              {/* Ghost button: Add slots Popover */}
+              <Popover
+                isOpen={isPopoverOpen}
+                onOpenChange={setIsPopoverOpen}
+                placement="bottom-end"
+                showArrow
+              >
+                <PopoverTrigger>
+                  <Button
+                    size="sm"
+                    variant="light"
+                    startContent={<Plus className="w-3.5 h-3.5 text-default-500" />}
+                    className="h-9 px-3 rounded-[10px] font-medium text-xs text-default-600 hover:text-foreground"
+                  >
+                    Add slots
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-3 w-56 rounded-[14px] border border-divider bg-content1 shadow-lg">
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold text-foreground">
+                      Add empty design slots
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        size="sm"
+                        min={1}
+                        max={summary?.room_for_new_designs || 20}
+                        value={String(slotCount)}
+                        onChange={(e) => setSlotCount(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20"
+                        aria-label="Slots count"
+                      />
+                      <Button
+                        size="sm"
+                        color="primary"
+                        isLoading={isAdding}
+                        onPress={handleAddSlots}
+                        className="flex-1 font-medium rounded-[10px]"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    <span className="text-[11px] text-default-400">
+                      Max {summary?.room_for_new_designs || 20} slots available
+                    </span>
                   </div>
-                  <span className="text-[11px] text-default-400">
-                    Max {summary?.room_for_new_designs || 20} slots available
-                  </span>
-                </div>
-              </PopoverContent>
-            </Popover>
+                </PopoverContent>
+              </Popover>
 
-            {/* New Sheet Confirmation */}
-            <Button
-              size="sm"
-              variant="light"
-              color="default"
-              startContent={<RotateCcw className="w-3.5 h-3.5" />}
-              onPress={onOpenConfirm}
-              className="text-default-600 hover:text-foreground font-medium"
-            >
-              New sheet
-            </Button>
+              {/* Ghost button: New sheet */}
+              <Button
+                size="sm"
+                variant="light"
+                startContent={<RotateCcw className="w-3.5 h-3.5 text-default-500" />}
+                onPress={onOpenConfirm}
+                className="h-9 px-3 rounded-[10px] font-medium text-xs text-default-600 hover:text-foreground"
+              >
+                New sheet
+              </Button>
+            </div>
 
-            {/* Primary Generate Action */}
+            {/* Mobile / Tablet (< 1024px) More Dropdown */}
+            <div className="lg:hidden flex items-center">
+              <Dropdown placement="bottom-end">
+                <DropdownTrigger>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    color="default"
+                    isIconOnly
+                    className="h-9 w-9 rounded-[10px] text-default-700 bg-content3 border border-divider"
+                    aria-label="More actions"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu aria-label="Toolbar options" variant="flat">
+                  <DropdownItem
+                    key="paste-json"
+                    startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
+                    onPress={onOpenBulkPaste}
+                  >
+                    Paste all JSON
+                  </DropdownItem>
+                  <DropdownItem
+                    key="add-slots"
+                    startContent={<Plus className="w-4 h-4 text-default-500" />}
+                    onPress={() => setIsPopoverOpen(true)}
+                  >
+                    Add slots
+                  </DropdownItem>
+                  <DropdownItem
+                    key="new-sheet"
+                    startContent={<RotateCcw className="w-4 h-4 text-default-500" />}
+                    onPress={onOpenConfirm}
+                  >
+                    New sheet
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </div>
+
+            {/* Dominant Primary Action: Generate .xls (ALWAYS visible) */}
             {readyCount === 0 ? (
               <Tooltip
                 content={
@@ -220,16 +271,17 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                     ? `${needsCount} design${needsCount > 1 ? "s" : ""} still need valid JSON`
                     : "No designs ready to generate"
                 }
-                placement="bottom"
+                placement="bottom-end"
                 delay={150}
               >
                 <span>
                   <Button
                     size="sm"
-                    color="success"
+                    color="primary"
+                    variant="solid"
                     isDisabled
                     startContent={<Download className="w-3.5 h-3.5" />}
-                    className="font-bold opacity-50 cursor-not-allowed"
+                    className="h-9 px-3.5 rounded-[10px] font-semibold text-xs opacity-50 cursor-not-allowed"
                   >
                     Generate .xls
                   </Button>
@@ -238,11 +290,12 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
             ) : (
               <Button
                 size="sm"
-                color="success"
+                color="primary"
+                variant="solid"
                 isLoading={isGenerating}
                 startContent={!isGenerating && <Download className="w-3.5 h-3.5" />}
                 onPress={handleGenerate}
-                className="font-bold text-white shadow-sm"
+                className="h-9 px-4 rounded-[10px] font-semibold text-xs text-white shadow-xs"
               >
                 {isGenerating ? "Generating..." : "Generate .xls"}
               </Button>
@@ -253,20 +306,23 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
 
       {/* New Sheet Confirmation Modal */}
       <Modal isOpen={isConfirmOpen} onOpenChange={onConfirmChange} size="sm">
-        <ModalContent>
+        <ModalContent className="rounded-[14px] border border-divider bg-content1 shadow-xl">
           {(onClose) => (
             <>
-              <ModalHeader className="text-base font-semibold">Start new sheet?</ModalHeader>
-              <ModalBody className="text-sm text-default-600">
+              <ModalHeader className="text-base font-semibold border-b border-divider py-3 px-5">
+                Start new sheet?
+              </ModalHeader>
+              <ModalBody className="text-sm text-default-600 p-5">
                 Your current sheet progress and designs will be cleared from this browser session.
               </ModalBody>
-              <ModalFooter>
-                <Button size="sm" variant="light" onPress={onClose}>
+              <ModalFooter className="border-t border-divider py-3 px-5 flex items-center justify-end gap-2">
+                <Button size="sm" variant="light" onPress={onClose} className="rounded-[10px]">
                   Cancel
                 </Button>
                 <Button
                   size="sm"
                   color="danger"
+                  className="rounded-[10px] font-medium"
                   onPress={() => {
                     onClose();
                     onNewSheet();

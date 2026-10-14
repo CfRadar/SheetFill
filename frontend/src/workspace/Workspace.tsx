@@ -54,7 +54,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
   };
 
   return (
-    <PageFade className="flex flex-col min-h-[calc(100vh-56px)] bg-background">
+    <PageFade className="flex flex-col min-h-[calc(100vh-56px)] bg-background text-foreground">
       {/* Sticky top workspace toolbar */}
       <StickyToolbar
         onOpenBulkPaste={() => setBulkDialogOpen(true)}
@@ -65,7 +65,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
 
       {/* Generation Report Modal / Panel if available */}
       {downloadInfo && (
-        <div className="max-w-7xl mx-auto w-full px-4 pt-4">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pt-4">
           <ReportPanel
             report={downloadInfo.report}
             downloadUrl={downloadInfo.url}
@@ -75,7 +75,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
         </div>
       )}
 
-      {/* Main Workspace Body */}
+      {/* Main Workspace Body: Container max-w-7xl with 24px top spacing, no black gap */}
       {designs.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-8">
           <EmptyState
@@ -84,9 +84,9 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
           />
         </div>
       ) : (
-        <div className="flex-1 flex overflow-hidden">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 flex gap-6 items-start">
           {/* Desktop Left Sidebar: Fixed 320px list of designs */}
-          <div className="hidden lg:block h-[calc(100vh-56px-53px)] sticky top-[53px]">
+          <div className="hidden lg:block w-80 shrink-0 rounded-[14px] border border-divider bg-content1 shadow-sm overflow-hidden h-[calc(100vh-56px-53px-48px)] sticky top-[77px]">
             <DesignListSidebar
               designs={designs}
               activeDesignId={activeDesignId}
@@ -95,8 +95,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
             />
           </div>
 
-          {/* Right Panel: Active Design Editor */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {/* Right Panel: Active Design Editor aligned at top */}
+          <main className="flex-1 min-w-0">
             {activeDesign ? (
               <DesignEditor
                 key={activeDesign.id}
@@ -122,10 +122,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
         placement="left"
         size="sm"
       >
-        <DrawerContent>
+        <DrawerContent className="rounded-r-[14px] bg-content1 border-r border-divider">
           {() => (
             <>
-              <DrawerHeader className="border-b border-divider text-base font-semibold">
+              <DrawerHeader className="border-b border-divider text-base font-semibold py-3 px-4">
                 Designs ({designs.length})
               </DrawerHeader>
               <DrawerBody className="p-0">

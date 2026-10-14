@@ -1,4 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
+import {
+  Button,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
+} from "@heroui/react";
+import { Copy, Check, FileText } from "lucide-react";
+import { toast } from "../ui/ToastProvider";
 
 export const FLIPKART_TSHIRT_PROMPT = `You are a Flipkart catalog specialist. I have uploaded 6 images of ONE oversized black women's T-shirt design. Return ONLY a valid JSON object (no markdown fences, no explanation) that follows the EXAMPLE below exactly in structure, length and writing style.
 
@@ -51,7 +62,7 @@ EXAMPLE (copy this structure, length and style; replace only the design-specific
   "brand_color": "Black",
   "occasion": "Casual",
   "style_code": "",
-  "description_override": "Women’s Premium Oversized Printed T-Shirt\n\nAdd a stylish retro touch to your everyday wardrobe with this premium black oversized printed T-shirt. Designed with a relaxed silhouette and a bold retro cartoon-inspired graphic print, this T-shirt combines comfort with a modern streetwear aesthetic. The soft, breathable fabric and oversized fit make it suitable for casual outings, college wear, travel, and everyday styling.\n\nKey Features:\n\nPremium-quality fabric\nStylish oversized / relaxed fit\nBold high-definition front graphic print\nClassic round crew neck\n3/4 sleeves\nSoft and comfortable feel\nBreathable and lightweight construction\nDurable print with vibrant detailing\nEasy to wash and maintain\nSuitable for casual, streetwear and everyday looks\n\nStyle: Oversized / Relaxed Fit\nColor: Black\nPattern: Graphic Print\nNeck: Round Neck\nSleeve: 3/4 Sleeve\nOccasion: Casual, Streetwear, Daily Wear\nPrint Placement: Front Only",
+  "description_override": "Women’s Premium Oversized Printed T-Shirt\\n\\nAdd a stylish retro touch to your everyday wardrobe with this premium black oversized printed T-shirt. Designed with a relaxed silhouette and a bold retro cartoon-inspired graphic print, this T-shirt combines comfort with a modern streetwear aesthetic. The soft, breathable fabric and oversized fit make it suitable for casual outings, college wear, travel, and everyday styling.\\n\\nKey Features:\\n\\nPremium-quality fabric\\nStylish oversized / relaxed fit\\nBold high-definition front graphic print\\nClassic round crew neck\\n3/4 sleeves\\nSoft and comfortable feel\\nBreathable and lightweight construction\\nDurable print with vibrant detailing\\nEasy to wash and maintain\\nSuitable for casual, streetwear and everyday looks\\n\\nStyle: Oversized / Relaxed Fit\\nColor: Black\\nPattern: Graphic Print\\nNeck: Round Neck\\nSleeve: 3/4 Sleeve\\nOccasion: Casual, Streetwear, Daily Wear\\nPrint Placement: Front Only",
   "search_keywords": "Graphic Print::Cartoon::Oversized::Casual",
   "key_features_sheet": "Graphic Print::Oversized Fit::Premium Cotton Fabric::Skin-Friendly Fabric",
   "fabric_care": "Regular Machine Wash",
@@ -67,40 +78,14 @@ TASK
 Now produce the JSON for the uploaded design. Keep every fixed field exactly as in the example (material, sleeve_type, neck_type, fit_type, ideal_for, color, brand_color, occasion, style_code, fabric_care, print_coverage, sleeve_details, detail_placement_rows, and the whole template text of description_override). Change only what depends on the design: the print wording in product_description and key_features[0], pattern, search_keywords, key_features_sheet[0], surface_styling, tee_length, detail_placement and "Print Placement". Output the JSON only.`;
 
 export const PromptDropdown: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [copied, setCopied] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Close when clicking outside
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleOutsideClick);
-      document.addEventListener("keydown", handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
 
   const copyToClipboard = async () => {
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(FLIPKART_TSHIRT_PROMPT);
       } else {
-        // Fallback for non-secure / local setups
         const textArea = document.createElement("textarea");
         textArea.value = FLIPKART_TSHIRT_PROMPT;
         textArea.style.position = "fixed";
@@ -113,6 +98,7 @@ export const PromptDropdown: React.FC = () => {
         textArea.remove();
       }
       setCopied(true);
+      toast.success("AI Prompt copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy prompt:", err);
@@ -120,124 +106,58 @@ export const PromptDropdown: React.FC = () => {
   };
 
   return (
-    <div className="relative inline-block text-left" ref={containerRef}>
-      {/* Button with dropdown on right */}
-      <div className="inline-flex items-center rounded-md shadow-sm border border-slate-700 bg-slate-800 hover:border-slate-600 transition-colors">
-        {/* Main action: Click to copy */}
-        <button
-          type="button"
-          onClick={copyToClipboard}
-          title="Click to copy prompt"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white hover:bg-slate-700/80 rounded-l-md transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          {copied ? (
+    <>
+      <Button
+        size="sm"
+        variant="flat"
+        color="default"
+        onPress={onOpen}
+        startContent={copied ? <Check className="w-3.5 h-3.5 text-success" /> : <FileText className="w-3.5 h-3.5 text-default-500" />}
+        className="h-9 px-3 rounded-[10px] font-medium text-xs text-foreground bg-content3 hover:bg-default-200 border border-divider transition-colors"
+      >
+        Prompt
+      </Button>
+
+      {/* HeroUI Prompt Viewer Modal */}
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
+        <ModalContent className="rounded-[14px] border border-divider bg-content1 shadow-xl">
+          {(onClose) => (
             <>
-              <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-emerald-400 font-medium">Copied!</span>
-            </>
-          ) : (
-            <>
-              <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-              </svg>
-              <span>Prompt</span>
+              <ModalHeader className="flex items-center justify-between border-b border-divider py-3.5 px-5">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                  <span className="text-sm font-semibold text-foreground">Flipkart Catalog Prompt Template</span>
+                </div>
+              </ModalHeader>
+              <ModalBody className="p-5 space-y-3">
+                <p className="text-xs text-default-500">
+                  Pass this prompt along with 6 product images to your AI vision model to generate schema-compliant JSON:
+                </p>
+                <div className="p-4 rounded-[10px] bg-content3 border border-divider font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap select-all max-h-[50vh] overflow-y-auto">
+                  {FLIPKART_TSHIRT_PROMPT}
+                </div>
+              </ModalBody>
+              <ModalFooter className="border-t border-divider py-3 px-5 flex items-center justify-between">
+                <span className="text-[11px] text-default-400">Click inside to select all text</span>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="light" onPress={onClose} className="rounded-[10px]">
+                    Close
+                  </Button>
+                  <Button
+                    size="sm"
+                    color="primary"
+                    startContent={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    onPress={copyToClipboard}
+                    className="rounded-[10px] font-semibold"
+                  >
+                    {copied ? "Copied!" : "Copy prompt"}
+                  </Button>
+                </div>
+              </ModalFooter>
             </>
           )}
-        </button>
-
-        {/* Dropdown toggle on right of button */}
-        <button
-          type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
-          title="View prompt"
-          aria-expanded={isOpen}
-          aria-label="View prompt dropdown"
-          className={`px-2 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-700/80 rounded-r-md border-l border-slate-700 transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-            isOpen ? "bg-slate-700 text-white" : ""
-          }`}
-        >
-          <svg
-            className={`w-3.5 h-3.5 transform transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Dropdown Popover */}
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-[90vw] max-w-[620px] rounded-xl bg-slate-900 border border-slate-700 shadow-2xl z-50 text-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-slate-800/90 border-b border-slate-700">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-              <h3 className="text-xs font-bold text-white tracking-wide uppercase">Flipkart Catalog Prompt</h3>
-              <span className="text-[11px] text-slate-400 font-mono">(Apparel / T-Shirts)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={copyToClipboard}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm"
-              >
-                {copied ? (
-                  <>
-                    <svg className="w-3.5 h-3.5 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    <span>Copy Prompt</span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700 transition-colors"
-                title="Close"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Subtitle / Instructions */}
-          <div className="px-4 py-2 bg-slate-950/50 border-b border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-            <span>Pass this prompt along with 6 product images to your AI vision model:</span>
-            <span className="text-[10px] text-slate-500">Auto-copies exact schema &amp; rules</span>
-          </div>
-
-          {/* Prompt Viewer Body */}
-          <div className="p-4 max-h-[60vh] overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-300 bg-slate-950/80 whitespace-pre-wrap select-all selection:bg-blue-600 selection:text-white scrollbar-thin scrollbar-thumb-slate-700">
-            {FLIPKART_TSHIRT_PROMPT}
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 py-2.5 bg-slate-800/80 border-t border-slate-700 flex items-center justify-between text-xs text-slate-400">
-            <span>Click inside to select all, or use the copy button.</span>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+        </ModalContent>
+      </Modal>
+    </>
   );
 };

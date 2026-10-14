@@ -12,7 +12,7 @@ import {
   Chip,
   Button,
 } from "@heroui/react";
-import { Moon, Sun, LogOut, Laptop } from "lucide-react";
+import { Moon, Sun, LogOut, Sparkles } from "lucide-react";
 import { useAuthStore } from "../auth/authStore";
 import { useTheme } from "./theme";
 
@@ -44,23 +44,23 @@ export const AppShell: React.FC<AppShellProps> = ({ title = "Sheet Filler", chil
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200">
       {/* 56px Top Bar */}
       <Navbar
         isBordered
         maxWidth="full"
-        className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4"
+        className="h-14 border-b border-divider bg-content1/90 backdrop-blur-md px-4 sm:px-6"
       >
         <NavbarBrand className="gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-black text-sm text-yellow-300 shadow-sm shrink-0">
-            FK
+          <div className="w-8 h-8 rounded-[8px] bg-primary flex items-center justify-center font-bold text-xs text-white shadow-xs shrink-0">
+            <Sparkles className="w-4 h-4" />
           </div>
-          <span className="font-bold text-base tracking-tight text-slate-900 dark:text-white">
+          <span className="font-semibold text-sm sm:text-base tracking-tight text-foreground">
             {title}
           </span>
         </NavbarBrand>
 
-        <NavbarContent justify="end" className="gap-3">
+        <NavbarContent justify="end" className="gap-2.5 sm:gap-3">
           {/* Days Left Chip (Subscribers only) */}
           {isSubscriber && typeof daysLeft === "number" && (
             <NavbarItem>
@@ -68,7 +68,7 @@ export const AppShell: React.FC<AppShellProps> = ({ title = "Sheet Filler", chil
                 size="sm"
                 color={getDaysChipColor(daysLeft)}
                 variant="flat"
-                className="font-semibold text-xs"
+                className="h-6 text-[11px] font-semibold border border-divider"
               >
                 {daysLeft === 0 ? "Expires today" : `${daysLeft} days left`}
               </Chip>
@@ -83,9 +83,9 @@ export const AppShell: React.FC<AppShellProps> = ({ title = "Sheet Filler", chil
               variant="light"
               aria-label="Toggle theme"
               onPress={toggleTheme}
-              className="text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="text-default-500 hover:text-foreground rounded-[10px]"
             >
-              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-default-600" />}
             </Button>
           </NavbarItem>
 
@@ -96,7 +96,7 @@ export const AppShell: React.FC<AppShellProps> = ({ title = "Sheet Filler", chil
                 <DropdownTrigger>
                   <button
                     type="button"
-                    className="flex items-center gap-2 p-0.5 rounded-full hover:ring-2 hover:ring-blue-500/20 transition-all focus:outline-none"
+                    className="flex items-center gap-2 p-0.5 rounded-full hover:ring-2 hover:ring-primary/20 transition-all focus:outline-none"
                     aria-label="Open user menu"
                   >
                     <Avatar
@@ -109,10 +109,10 @@ export const AppShell: React.FC<AppShellProps> = ({ title = "Sheet Filler", chil
                 </DropdownTrigger>
                 <DropdownMenu aria-label="User actions" variant="flat">
                   <DropdownItem key="profile" textValue="User info" className="h-14 gap-2 cursor-default opacity-90" isReadOnly>
-                    <p className="font-semibold text-xs text-slate-900 dark:text-white">
+                    <p className="font-semibold text-xs text-foreground">
                       {user.display_name || user.username}
                     </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                    <p className="text-[11px] text-default-400 font-mono">
                       @{user.username} {user.role === "admin" && "(Admin)"}
                     </p>
                   </DropdownItem>
@@ -133,7 +133,7 @@ export const AppShell: React.FC<AppShellProps> = ({ title = "Sheet Filler", chil
       </Navbar>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col">{children}</main>
+      <main className="flex-1 flex flex-col bg-background">{children}</main>
     </div>
   );
 };

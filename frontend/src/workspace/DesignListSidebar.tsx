@@ -3,6 +3,7 @@ import { Tabs, Tab, Input } from "@heroui/react";
 import { Search } from "lucide-react";
 import { DetectedDesign } from "../types";
 import { StatusChip } from "../ui/StatusChip";
+import { resolveDesignSizes } from "../utils/designUtils";
 
 interface DesignListSidebarProps {
   designs: DetectedDesign[];
@@ -88,34 +89,63 @@ export const DesignListSidebar: React.FC<DesignListSidebarProps> = ({
           color="primary"
           aria-label="Filter designs by status"
           classNames={{
-            tabList: "w-full justify-between gap-0 p-0 border-b border-transparent",
+            tabList: "w-full justify-between gap-1 p-0 border-b border-divider",
             cursor: "w-full bg-primary",
-            tab: "max-w-fit px-2 h-8 text-xs font-medium",
+            tab: "px-2 h-9 text-xs font-medium",
             tabContent: "group-data-[selected=true]:font-bold",
           }}
         >
-          <Tab key="all" title={`All (${designs.length})`} />
-          <Tab key="needs_json" title={`Needs JSON (${needsJsonCount})`} />
-          <Tab key="ready" title={`Ready (${readyCount})`} />
+          <Tab
+            key="all"
+            title={
+              <div className="flex items-center gap-1.5">
+                <span>All</span>
+                <span className="text-[11px] text-default-400 font-mono">({designs.length})</span>
+              </div>
+            }
+          />
+          <Tab
+            key="needs_json"
+            title={
+              <div className="flex items-center gap-1.5">
+                <span>Needs JSON</span>
+                <span className="text-[11px] text-default-400 font-mono">({needsJsonCount})</span>
+              </div>
+            }
+          />
+          <Tab
+            key="ready"
+            title={
+              <div className="flex items-center gap-1.5">
+                <span>Ready</span>
+                <span className="text-[11px] text-default-400 font-mono">({readyCount})</span>
+              </div>
+            }
+          />
         </Tabs>
 
-        {designs.length > 5 && (
+        {designs.length > 3 && (
           <Input
             size="sm"
             placeholder="Search designs or rows..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            startContent={<Search className="w-3.5 h-3.5 text-default-400" />}
+            variant="bordered"
+            startContent={<Search className="w-3.5 h-3.5 text-default-400 shrink-0 ml-1 mr-1.5" />}
             isClearable
             onClear={() => setSearch("")}
             className="w-full"
+            classNames={{
+              inputWrapper: "h-9 rounded-[10px] border-divider hover:border-default-400",
+              input: "text-xs",
+            }}
             aria-label="Search designs"
           />
         )}
       </div>
 
       {/* Scrollable Designs List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 focus:outline-none">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1 focus:outline-none">
         {filteredDesigns.length === 0 ? (
           <div className="py-8 text-center text-xs text-default-400">
             No designs match this filter
@@ -124,7 +154,8 @@ export const DesignListSidebar: React.FC<DesignListSidebarProps> = ({
           filteredDesigns.map((design) => {
             const isActive = design.id === activeDesignId;
             const globalIndex = designs.findIndex((d) => d.id === design.id);
-            const sizes = designSizes[design.id] || design.sizes_found || ["S", "M", "L", "XL"];
+            // Parity with editor: always resolve sizes via resolveDesignSizes
+            const sizes = resolveDesignSizes(designSizes[design.id], design.sizes_found);
             const rowsStr =
               design.sheet_rows.length > 1
                 ? `r${design.sheet_rows[0]}..${design.sheet_rows[design.sheet_rows.length - 1]}`
@@ -138,16 +169,16 @@ export const DesignListSidebar: React.FC<DesignListSidebarProps> = ({
                 ref={isActive ? activeItemRef : null}
                 type="button"
                 onClick={() => onSelectDesign(design.id)}
-                className={`w-full text-left p-2.5 rounded-xl border transition-all duration-150 flex items-center justify-between gap-2.5 focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                className={`w-full text-left p-2.5 rounded-[10px] border transition-all duration-120 flex items-center justify-between gap-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 ${
                   isActive
-                    ? "bg-primary-50/80 dark:bg-primary-950/40 border-primary-400 dark:border-primary-600 shadow-xs"
-                    : "bg-content2/40 hover:bg-content2/80 border-transparent text-default-700"
+                    ? "bg-primary-50/70 dark:bg-primary-950/30 border-primary/40 shadow-xs"
+                    : "bg-transparent hover:bg-content3 border-transparent text-default-700"
                 }`}
                 aria-selected={isActive}
               >
                 {/* Thumbnail & Title */}
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className="w-9 h-9 rounded-lg bg-default-100 border border-divider overflow-hidden flex-shrink-0 flex items-center justify-center text-[11px] font-bold text-default-400">
+                  <div className="w-8 h-8 rounded-[8px] bg-content3 border border-divider overflow-hidden flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-default-400">
                     {design.main_image_url ? (
                       <img
                         src={design.main_image_url}
@@ -164,15 +195,15 @@ export const DesignListSidebar: React.FC<DesignListSidebarProps> = ({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 truncate">
+                    <div className="truncate">
                       <span className="text-xs font-semibold text-foreground truncate">
                         #{globalIndex + 1} {design.base || "Unnamed stub"}
                       </span>
                     </div>
-                    <div className="text-[11px] text-default-400 mt-0.5 truncate flex items-center gap-1.5">
+                    <div className="text-[11px] text-default-400 mt-0.5 truncate flex items-center gap-1.5 font-medium">
                       <span>{sizes.length} sizes</span>
                       <span>•</span>
-                      <span className="font-mono">{rowsStr}</span>
+                      <span className="font-mono text-[10px]">{rowsStr}</span>
                     </div>
                   </div>
                 </div>
