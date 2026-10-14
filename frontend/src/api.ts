@@ -1,4 +1,5 @@
 import {
+  BrandMeta,
   BulkAssignResponse,
   PutJsonResponse,
   SessionState,
@@ -159,4 +160,37 @@ export async function getAllowedValues(attribute: string): Promise<string[]> {
   if (!res.ok) return [];
   const data = await res.json();
   return data.values || [];
+}
+
+export async function saveDesignMeta(
+  sessionId: string,
+  designId: string,
+  meta: BrandMeta
+): Promise<any> {
+  const res = await fetch(`${BASE_URL}/sheets/${sessionId}/designs/${designId}/meta`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(meta),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err?.error?.message || "Failed to save brand & manufacturer details");
+  }
+  return res.json();
+}
+
+export async function applyMetaToAll(
+  sessionId: string,
+  meta: BrandMeta
+): Promise<any> {
+  const res = await fetch(`${BASE_URL}/sheets/${sessionId}/meta/apply-all`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(meta),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err?.error?.message || "Failed to apply details to all T-shirts");
+  }
+  return res.json();
 }

@@ -40,6 +40,9 @@ export const RowsPreview: React.FC<RowsPreviewProps> = ({ rows }) => {
               <tr className="bg-slate-100 border-b border-slate-200 text-[11px] font-semibold text-slate-600">
                 <th className="p-2 border-r border-slate-200">Size (AR)</th>
                 <th className="p-2 border-r border-slate-200 bg-blue-50/70 text-blue-900">Seller SKU ID (G)</th>
+                <th className="p-2 border-r border-slate-200 bg-indigo-50/70 text-indigo-900">HSN (Y)</th>
+                <th className="p-2 border-r border-slate-200">Brand (AG)</th>
+                <th className="p-2 border-r border-slate-200">Manufacturer (AB)</th>
                 <th className="p-2 border-r border-slate-200">Neck (AH)</th>
                 <th className="p-2 border-r border-slate-200">Sleeve (AL)</th>
                 <th className="p-2 border-r border-slate-200">Color (AS)</th>
@@ -58,6 +61,11 @@ export const RowsPreview: React.FC<RowsPreviewProps> = ({ rows }) => {
                   <td className="p-2 font-mono text-blue-700 font-semibold border-r border-slate-200 bg-blue-50/40">
                     {row.cells["G"]}
                   </td>
+                  <td className="p-2 font-mono text-indigo-700 font-semibold border-r border-slate-200 bg-indigo-50/30">
+                    {row.cells["Y"]}
+                  </td>
+                  <td className="p-2 border-r border-slate-200 font-medium">{row.cells["AG"]}</td>
+                  <td className="p-2 border-r border-slate-200 text-slate-600">{row.cells["AB"]}</td>
                   <td className="p-2 border-r border-slate-200">{row.cells["AH"]}</td>
                   <td className="p-2 border-r border-slate-200">{row.cells["AL"]}</td>
                   <td className="p-2 border-r border-slate-200">{row.cells["AS"]}</td>

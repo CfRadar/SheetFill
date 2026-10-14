@@ -39,9 +39,17 @@ export interface SessionState {
   design_sizes: Record<string, string[]>;
   design_image_edits: Record<string, (string | null)[]>;
   design_product_links: Record<string, string | null>;
+  design_meta?: Record<string, BrandMeta>;
+  global_meta?: BrandMeta;
   download_url?: string | null;
   output_filename?: string | null;
   report?: any;
+}
+
+export interface BrandMeta {
+  brand?: string;
+  manufacturer?: string;
+  hsn?: string;
 }
 
 export interface ValidationIssue {

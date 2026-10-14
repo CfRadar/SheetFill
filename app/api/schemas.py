@@ -36,9 +36,17 @@ class SessionResponse(BaseModel):
     design_sizes: Dict[str, List[str]]
     design_image_edits: Dict[str, List[Optional[str]]]
     design_product_links: Dict[str, Optional[str]]
+    design_meta: Dict[str, Dict[str, str]] = Field(default_factory=dict)
+    global_meta: Dict[str, str] = Field(default_factory=dict)
     download_url: Optional[str] = None
     output_filename: Optional[str] = None
     report: Optional[Dict[str, Any]] = None
+
+
+class BrandMetaRequest(BaseModel):
+    brand: Optional[str] = None
+    manufacturer: Optional[str] = None
+    hsn: Optional[str] = None
 
 
 class AddSlotsRequest(BaseModel):

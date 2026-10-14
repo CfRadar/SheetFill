@@ -26,6 +26,8 @@ class SessionState(BaseModel):
     design_sizes: Dict[str, List[str]] = Field(default_factory=dict)  # did -> custom sizes if ticked
     design_image_edits: Dict[str, List[Optional[str]]] = Field(default_factory=dict)
     design_product_links: Dict[str, Optional[str]] = Field(default_factory=dict)
+    design_meta: Dict[str, Dict[str, str]] = Field(default_factory=dict)  # did -> {"brand": ..., "manufacturer": ..., "hsn": ...}
+    global_meta: Dict[str, str] = Field(default_factory=dict)  # {"brand": ..., "manufacturer": ..., "hsn": ...}
     output_filename: Optional[str] = None
     report: Optional[Dict[str, Any]] = None
 
@@ -164,6 +166,7 @@ class DesignStore:
         state.design_sizes.pop(design_id, None)
         state.design_image_edits.pop(design_id, None)
         state.design_product_links.pop(design_id, None)
+        state.design_meta.pop(design_id, None)
 
         self.update_summary(state)
         self.save_session(state)
@@ -253,6 +256,60 @@ class DesignStore:
             if d.id == design_id:
                 d.sizes_found = sizes
                 break
+
+        self.save_session(state)
+        return state
+
+    def save_design_meta(
+        self,
+        session_id: str,
+        design_id: str,
+        brand: Optional[str] = None,
+        manufacturer: Optional[str] = None,
+        hsn: Optional[str] = None,
+    ) -> Optional[SessionState]:
+        """Updates brand, manufacturer, and HSN for a specific design."""
+        state = self.get_session(session_id)
+        if not state:
+            return None
+
+        cur = state.design_meta.get(design_id, {})
+        if brand is not None:
+            cur["brand"] = brand.strip()
+        if manufacturer is not None:
+            cur["manufacturer"] = manufacturer.strip()
+        if hsn is not None:
+            cur["hsn"] = hsn.strip()
+        state.design_meta[design_id] = cur
+
+        self.save_session(state)
+        return state
+
+    def apply_meta_to_all(
+        self,
+        session_id: str,
+        brand: Optional[str] = None,
+        manufacturer: Optional[str] = None,
+        hsn: Optional[str] = None,
+    ) -> Optional[SessionState]:
+        """Applies brand, manufacturer, and HSN to all designs and updates global_meta."""
+        state = self.get_session(session_id)
+        if not state:
+            return None
+
+        meta = dict(state.global_meta)
+        if brand is not None:
+            meta["brand"] = brand.strip()
+        if manufacturer is not None:
+            meta["manufacturer"] = manufacturer.strip()
+        if hsn is not None:
+            meta["hsn"] = hsn.strip()
+
+        state.global_meta = meta
+        for d in state.designs:
+            cur = state.design_meta.get(d.id, {})
+            cur.update(meta)
+            state.design_meta[d.id] = cur
 
         self.save_session(state)
         return state

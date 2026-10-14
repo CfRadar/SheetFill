@@ -48,6 +48,7 @@ def build_design_rows(
     image_edits: Optional[List[Optional[str]]] = None,
     product_link_edit: Optional[str] = None,
     existing_urls_by_design: Optional[Dict[str, str]] = None,
+    meta_override: Optional[Dict[str, str]] = None,
 ) -> BuildResult:
     """Builds size rows for a single design adhering strictly to Section 5 rules."""
     errors: List[ValidationIssue] = []
@@ -467,9 +468,41 @@ def build_design_rows(
         else design.existing_values.get("L", defaults.get("selling_price", 749))
     )
 
+    # Brand (Col AG), Manufacturer (Col AB), HSN (Col Y) resolution:
+    # Priority: meta_override > json_data > design.existing_values > defaults
+    brand_val = (
+        (meta_override.get("brand") if meta_override else None)
+        or json_data.get("brand")
+        or design.existing_values.get("AG")
+        or defaults.get("brand", "fashion continental")
+    )
+    brand_val = str(brand_val).strip()
+
+    manufacturer_val = (
+        (meta_override.get("manufacturer") if meta_override else None)
+        or json_data.get("manufacturer")
+        or design.existing_values.get("AB")
+        or defaults.get("manufacturer", "fashion continental")
+    )
+    manufacturer_val = str(manufacturer_val).strip()
+
+    hsn_override = (
+        (meta_override.get("hsn") if meta_override else None)
+        or json_data.get("hsn")
+        or json_data.get("hsn_code")
+    )
+    if hsn_override and str(hsn_override).strip():
+        hsn_val = str(hsn_override).strip()
+    else:
+        exist_y = str(design.existing_values.get("Y") or "").strip()
+        # If existing value is purely numeric (like 6109, 61091000), keep it; if it is SKU-like (has letters), discard
+        if exist_y and exist_y.replace(".", "").isdigit():
+            hsn_val = exist_y
+        else:
+            hsn_val = str(defaults.get("hsn_fixed") or "61091000").strip()
+
     for size in sizes:
         sku = f"{sku_base}_{size}"
-        hsn_val = sku if hsn_mode == "sku" else str(defaults.get("hsn_fixed", ""))
 
         # Detail Placement logic
         if dp_rows == "all" or (isinstance(dp_rows, list) and size in dp_rows):
@@ -498,9 +531,9 @@ def build_design_rows(
             "Y": hsn_val,
             "Z": float(design.existing_values.get("Z", defaults.get("luxury_cess", 0))),
             "AA": str(design.existing_values.get("AA", defaults.get("country_of_origin", "India"))),
-            "AB": str(design.existing_values.get("AB", defaults.get("manufacturer", "fashion continental"))),
+            "AB": manufacturer_val,
             "AE": str(design.existing_values.get("AE", defaults.get("tax_code", "GST_APPAREL"))),
-            "AG": str(design.existing_values.get("AG", defaults.get("brand", "fashion continental"))),
+            "AG": brand_val,
             "AH": mapped_neck,
             "AI": mapped_pattern,
             "AJ": mapped_fabric,

@@ -51,4 +51,4 @@ def test_moonlight_row_generation(mapper):
         assert r.get("J") == "Active"
         assert r.get("K") == 1999
         assert r.get("L") == 749
-        assert r.get("Y") == f"moonlight_os_{expected_size}"
+        assert r.get("Y") == "61091000"

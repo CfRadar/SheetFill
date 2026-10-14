@@ -68,7 +68,8 @@ def test_api_full_flow_compare_with_2_final():
     # Key features: dynamic from batch JSON vs fixed raw text in sample
     # Surface styling: dynamic from description text
     # Tee length: 1_before.xls stub row 11 explicitly contains 'Long' while 2_final has 'Medium'
-    intentional_columns = {"AI", "BH", "BO", "BJ", "BF"}
+    # HSN: 2_final.xlsm incorrectly put SKU string in Col Y; our system sets the valid GST HSN 61091000
+    intentional_columns = {"AI", "BH", "BO", "BJ", "BF", "Y"}
 
     unexpected_diffs = []
     for r in range(5, 37):
@@ -139,3 +140,53 @@ def test_api_file_size_limit():
     large_payload = b"0" * (26 * 1024 * 1024)
     resp = client.post("/api/sheets/analyze", files={"file": ("huge.xlsm", large_payload, "application/vnd.ms-excel")})
     assert resp.status_code == 413
+
+
+def test_api_meta_brand_manufacturer_hsn_endpoints():
+    xls_path = FIXTURES_DIR / "1_before.xls"
+    with open(xls_path, "rb") as f:
+        resp = client.post("/api/sheets/analyze", files={"file": ("1_before.xls", f, "application/vnd.ms-excel")})
+    assert resp.status_code == 200
+    sid = resp.json()["session_id"]
+
+    # 1. Update single design meta (d1)
+    resp = client.put(
+        f"/api/sheets/{sid}/designs/d1/meta",
+        json={"brand": "BrandOne", "manufacturer": "MfgOne, Delhi", "hsn": "61099010"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["design_meta"]["brand"] == "BrandOne"
+    assert data["design_meta"]["manufacturer"] == "MfgOne, Delhi"
+    assert data["design_meta"]["hsn"] == "61099010"
+
+    # 2. Put JSON for d1 and verify preview rows contain these values
+    sample_json = (FIXTURES_DIR / "moonlight.json").read_text(encoding="utf-8")
+    resp = client.put(f"/api/sheets/{sid}/designs/d1/json", json={"raw_text": sample_json})
+    assert resp.status_code == 200
+    rows = resp.json()["preview_rows"]
+    assert len(rows) == 4
+    for r in rows:
+        assert r["cells"]["AG"] == "BrandOne"
+        assert r["cells"]["AB"] == "MfgOne, Delhi"
+        assert r["cells"]["Y"] == "61099010"
+
+    # 3. Apply to all designs
+    resp = client.post(
+        f"/api/sheets/{sid}/meta/apply-all",
+        json={"brand": "GlobalBrand", "manufacturer": "GlobalMfg, Mumbai", "hsn": "61091000"},
+    )
+    assert resp.status_code == 200
+    all_data = resp.json()
+    assert all_data["global_meta"]["brand"] == "GlobalBrand"
+    assert all_data["global_meta"]["manufacturer"] == "GlobalMfg, Mumbai"
+    assert all_data["global_meta"]["hsn"] == "61091000"
+
+    # d1 was refreshed: verify get_session has global and design meta
+    resp = client.get(f"/api/sheets/{sid}")
+    assert resp.status_code == 200
+    sess_data = resp.json()
+    assert sess_data["global_meta"]["brand"] == "GlobalBrand"
+    assert sess_data["design_meta"]["d1"]["brand"] == "GlobalBrand"
+    assert sess_data["design_meta"]["d1"]["hsn"] == "61091000"
+

@@ -56,7 +56,7 @@ def test_same_across_sizes(mapper, moonlight_design, sample_json):
     for i, size in enumerate(sizes):
         assert rows[i].get("AR") == size
         assert rows[i].get("G") == f"{moonlight_design.base}_{size}"
-        assert rows[i].get("Y") == f"{moonlight_design.base}_{size}"
+        assert rows[i].get("Y") == "61091000"
 
     # Detail placement BD written on S only by default
     assert rows[0].get("BD") is not None
@@ -90,3 +90,21 @@ def test_duplicate_sku_blocked(mapper, moonlight_design, sample_json):
     b_res = build_design_rows(moonlight_design, sample_json, mapper, existing_skus)
     assert b_res.status == "blocked"
     assert any("Duplicate Seller SKU ID" in e.message for e in b_res.errors)
+
+
+def test_meta_override_brand_manufacturer_hsn(mapper, moonlight_design, sample_json):
+    existing_skus = set()
+    meta = {
+        "brand": "Custom Brand Apparel",
+        "manufacturer": "Custom Textiles Pvt Ltd, Surat",
+        "hsn": "61099010",
+    }
+    b_res = build_design_rows(
+        moonlight_design, sample_json, mapper, existing_skus, meta_override=meta
+    )
+    assert b_res.status == "ready"
+    for r in b_res.rows:
+        assert r.get("AG") == "Custom Brand Apparel"
+        assert r.get("AB") == "Custom Textiles Pvt Ltd, Surat"
+        assert r.get("Y") == "61099010"
+

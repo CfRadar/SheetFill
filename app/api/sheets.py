@@ -23,6 +23,7 @@ from app.api.schemas import (
     PutJsonResponse,
     PutSizesRequest,
     SessionResponse,
+    BrandMetaRequest,
 )
 from app.services.builder import build_design_rows, get_default_mapper
 from app.services.bulk_matcher import match_bulk_json, parse_batch_json
@@ -126,6 +127,8 @@ def get_session_state(sid: str) -> Any:
         design_sizes=session.design_sizes,
         design_image_edits=session.design_image_edits,
         design_product_links=session.design_product_links,
+        design_meta=session.design_meta,
+        global_meta=session.global_meta,
         download_url=download_url,
         output_filename=session.output_filename,
         report=session.report,
@@ -246,6 +249,8 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
     custom_sizes = session.design_sizes.get(did)
     image_edits = session.design_image_edits.get(did)
     prod_link_edit = session.design_product_links.get(did)
+    meta_override = dict(session.global_meta or {})
+    meta_override.update(session.design_meta.get(did, {}))
 
     b_res = build_design_rows(
         design=target_design,
@@ -255,6 +260,7 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
         custom_sizes=custom_sizes,
         image_edits=image_edits,
         product_link_edit=prod_link_edit,
+        meta_override=meta_override,
     )
 
     # Save to store
@@ -335,6 +341,112 @@ def put_design_sizes(sid: str, did: str, req: PutSizesRequest) -> Any:
     return {"status": "ok", "design": next((d for d in updated.designs if d.id == did), None)}
 
 
+@router.put("/sheets/{sid}/designs/{did}/meta")
+def put_design_meta(sid: str, did: str, req: BrandMetaRequest) -> Any:
+    session = store.get_session(sid)
+    if not session:
+        return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
+
+    target_design = next((d for d in session.designs if d.id == did), None)
+    if not target_design:
+        return _json_error(404, "DESIGN_NOT_FOUND", f"Design '{did}' not found")
+
+    updated = store.save_design_meta(
+        session_id=sid,
+        design_id=did,
+        brand=req.brand,
+        manufacturer=req.manufacturer,
+        hsn=req.hsn,
+    )
+
+    # Re-evaluate design status if json exists
+    preview_rows = []
+    if did in updated.design_jsons:
+        mapper = get_default_mapper(_get_master_template_path())
+        meta_override = dict(updated.global_meta or {})
+        meta_override.update(updated.design_meta.get(did, {}))
+        b_res = build_design_rows(
+            design=target_design,
+            json_data=updated.design_jsons[did],
+            mapper=mapper,
+            existing_skus_in_session=set(),
+            custom_sizes=updated.design_sizes.get(did),
+            image_edits=updated.design_image_edits.get(did),
+            product_link_edit=updated.design_product_links.get(did),
+            meta_override=meta_override,
+        )
+        store.save_design_json(
+            session_id=sid,
+            design_id=did,
+            raw_text=updated.design_raw_text.get(did, ""),
+            parsed_json=updated.design_jsons[did],
+            status=b_res.status,
+            warnings=[w.message for w in b_res.warnings],
+            errors=[e.message for e in b_res.errors],
+        )
+        preview_rows = [
+            PreviewRow(sheet_row_index=r.row_index, size=r.size, cells=r.cells)
+            for r in b_res.rows
+        ]
+        updated = store.get_session(sid)
+
+    return {
+        "status": "ok",
+        "design_meta": updated.design_meta.get(did, {}),
+        "preview_rows": preview_rows,
+        "design": next((d for d in updated.designs if d.id == did), None),
+    }
+
+
+@router.post("/sheets/{sid}/meta/apply-all")
+def apply_meta_all(sid: str, req: BrandMetaRequest) -> Any:
+    session = store.get_session(sid)
+    if not session:
+        return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
+
+    updated = store.apply_meta_to_all(
+        session_id=sid,
+        brand=req.brand,
+        manufacturer=req.manufacturer,
+        hsn=req.hsn,
+    )
+
+    # Re-evaluate all designs that have JSON
+    mapper = get_default_mapper(_get_master_template_path())
+    for d in updated.designs:
+        if d.id in updated.design_jsons:
+            meta_override = dict(updated.global_meta or {})
+            meta_override.update(updated.design_meta.get(d.id, {}))
+            b_res = build_design_rows(
+                design=d,
+                json_data=updated.design_jsons[d.id],
+                mapper=mapper,
+                existing_skus_in_session=set(),
+                custom_sizes=updated.design_sizes.get(d.id),
+                image_edits=updated.design_image_edits.get(d.id),
+                product_link_edit=updated.design_product_links.get(d.id),
+                meta_override=meta_override,
+            )
+            store.save_design_json(
+                session_id=sid,
+                design_id=d.id,
+                raw_text=updated.design_raw_text.get(d.id, ""),
+                parsed_json=updated.design_jsons[d.id],
+                status=b_res.status,
+                warnings=[w.message for w in b_res.warnings],
+                errors=[e.message for e in b_res.errors],
+            )
+
+    refreshed = store.get_session(sid)
+    return {
+        "status": "ok",
+        "global_meta": refreshed.global_meta,
+        "design_meta": refreshed.design_meta,
+        "designs": refreshed.designs,
+        "summary": refreshed.summary,
+    }
+
+
 @router.post("/sheets/{sid}/bulk-assign")
 def bulk_assign(sid: str, req: BulkAssignRequest) -> Any:
     session = store.get_session(sid)
@@ -381,6 +493,9 @@ def bulk_confirm(sid: str, req: BulkConfirmRequest) -> Any:
             continue
 
         jobj = pair.parsed_json or {}
+        meta_override = dict(session.global_meta or {})
+        meta_override.update(session.design_meta.get(did, {}))
+
         b_res = build_design_rows(
             design=target_design,
             json_data=jobj,
@@ -389,6 +504,7 @@ def bulk_confirm(sid: str, req: BulkConfirmRequest) -> Any:
             custom_sizes=session.design_sizes.get(did),
             image_edits=session.design_image_edits.get(did),
             product_link_edit=session.design_product_links.get(did),
+            meta_override=meta_override,
         )
 
         store.save_design_json(
@@ -456,6 +572,9 @@ def generate_workbook(sid: str, req: GenerateRequest) -> Any:
     for d in session.designs:
         if d.id in session.design_jsons:
             jobj = session.design_jsons[d.id]
+            meta_override = dict(session.global_meta or {})
+            meta_override.update(session.design_meta.get(d.id, {}))
+
             b_res = build_design_rows(
                 design=d,
                 json_data=jobj,
@@ -464,6 +583,7 @@ def generate_workbook(sid: str, req: GenerateRequest) -> Any:
                 custom_sizes=session.design_sizes.get(d.id),
                 image_edits=session.design_image_edits.get(d.id),
                 product_link_edit=session.design_product_links.get(d.id),
+                meta_override=meta_override,
             )
             if b_res.status == "ready":
                 ready_rows_map[d.id] = b_res.rows
