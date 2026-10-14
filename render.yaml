@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: flipkart-sheet-filler
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt && cd frontend && npm install && npm run build && cd ..
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENV
+        value: production
+      - key: MONGODB_DB
+        value: sheetfill
+      - key: ACCESS_TOKEN_MINUTES
+        value: "480"
+      - key: SESSION_POLICY
+        value: replace
+      - key: MAX_UPLOAD_MB
+        value: "10"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
