@@ -496,6 +496,9 @@ async def logout(
 def _extract_token(request: Request, authorization: Optional[str]) -> Optional[str]:
     if authorization and authorization.lower().startswith("bearer "):
         return authorization[7:].strip()
+    token_param = request.query_params.get("token")
+    if token_param:
+        return token_param.strip()
     return request.cookies.get("access_token")
 
 

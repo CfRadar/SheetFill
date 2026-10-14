@@ -230,6 +230,39 @@ export async function generateWorkbook(
   return res.json();
 }
 
+/**
+ * Downloads the generated workbook using an authenticated request with bearer token,
+ * streaming the Blob and triggering a clean client-side file save.
+ */
+export async function downloadWorkbookFile(
+  downloadUrl: string,
+  filename?: string
+): Promise<void> {
+  const url = downloadUrl.startsWith("http")
+    ? downloadUrl
+    : `${API_BASE}${downloadUrl.startsWith("/") ? downloadUrl : `/${downloadUrl}`}`;
+
+  const res = await authFetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      err?.detail?.message ||
+        err?.error?.message ||
+        `Download failed with HTTP status ${res.status}`
+    );
+  }
+
+  const blob = await res.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename || "Flipkart_Filled_TShirt_Sheet.xlsm";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(blobUrl);
+}
+
 export async function getAllowedValues(attribute: string): Promise<string[]> {
   const res = await authFetch(`${BASE_URL}/allowed-values/${attribute}`);
   if (!res.ok) return [];
