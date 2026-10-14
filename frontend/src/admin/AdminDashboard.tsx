@@ -404,103 +404,115 @@ export const AdminDashboard: React.FC = () => {
           {/* 6 Metric Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* 1. Total Subscribers */}
-            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
-              <CardBody className="p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-[10px] bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs font-medium text-default-400">Total subscribers</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
-                    <div className="text-2xl font-bold tracking-tight text-foreground">
-                      {stats ? stats.total_users : "—"}
-                    </div>
-                  </Skeleton>
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px] hover:border-default-300 transition-colors">
+              <CardBody className="p-4 sm:p-5">
+                <div className="flex flex-row items-center gap-4 text-left">
+                  <div className="w-12 h-12 rounded-[12px] bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-default-500">Total subscribers</div>
+                    <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5 w-fit">
+                      <div className="text-2xl font-bold tracking-tight text-foreground">
+                        {stats ? stats.total_users : "—"}
+                      </div>
+                    </Skeleton>
+                  </div>
                 </div>
               </CardBody>
             </Card>
 
             {/* 2. Active Subscriptions */}
-            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
-              <CardBody className="p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-[10px] bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs font-medium text-default-400">Active subscriptions</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
-                    <div className="text-2xl font-bold tracking-tight text-emerald-500">
-                      {stats ? stats.active_subscriptions : "—"}
-                    </div>
-                  </Skeleton>
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px] hover:border-default-300 transition-colors">
+              <CardBody className="p-4 sm:p-5">
+                <div className="flex flex-row items-center gap-4 text-left">
+                  <div className="w-12 h-12 rounded-[12px] bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-default-500">Active subscriptions</div>
+                    <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5 w-fit">
+                      <div className="text-2xl font-bold tracking-tight text-emerald-500">
+                        {stats ? stats.active_subscriptions : "—"}
+                      </div>
+                    </Skeleton>
+                  </div>
                 </div>
               </CardBody>
             </Card>
 
             {/* 3. Expiring Soon */}
-            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
-              <CardBody className="p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-[10px] bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs font-medium text-default-400">Expiring in 7 days</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
-                    <div className="text-2xl font-bold tracking-tight text-amber-500">
-                      {stats ? stats.expiring_soon : "—"}
-                    </div>
-                  </Skeleton>
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px] hover:border-default-300 transition-colors">
+              <CardBody className="p-4 sm:p-5">
+                <div className="flex flex-row items-center gap-4 text-left">
+                  <div className="w-12 h-12 rounded-[12px] bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-default-500">Expiring in 7 days</div>
+                    <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5 w-fit">
+                      <div className="text-2xl font-bold tracking-tight text-amber-500">
+                        {stats ? stats.expiring_soon : "—"}
+                      </div>
+                    </Skeleton>
+                  </div>
                 </div>
               </CardBody>
             </Card>
 
             {/* 4. Expired Accounts */}
-            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
-              <CardBody className="p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-[10px] bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
-                  <XCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs font-medium text-default-400">Expired accounts</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
-                    <div className="text-2xl font-bold tracking-tight text-rose-500">
-                      {stats ? stats.expired : "—"}
-                    </div>
-                  </Skeleton>
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px] hover:border-default-300 transition-colors">
+              <CardBody className="p-4 sm:p-5">
+                <div className="flex flex-row items-center gap-4 text-left">
+                  <div className="w-12 h-12 rounded-[12px] bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                    <XCircle className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-default-500">Expired accounts</div>
+                    <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5 w-fit">
+                      <div className="text-2xl font-bold tracking-tight text-rose-500">
+                        {stats ? stats.expired : "—"}
+                      </div>
+                    </Skeleton>
+                  </div>
                 </div>
               </CardBody>
             </Card>
 
             {/* 5. Online Now */}
-            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
-              <CardBody className="p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-[10px] bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                  <Radio className="w-5 h-5 animate-pulse" />
-                </div>
-                <div>
-                  <div className="text-xs font-medium text-default-400">Online now</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
-                    <div className="text-2xl font-bold tracking-tight text-emerald-500">
-                      {stats ? stats.online_now : "—"}
-                    </div>
-                  </Skeleton>
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px] hover:border-default-300 transition-colors">
+              <CardBody className="p-4 sm:p-5">
+                <div className="flex flex-row items-center gap-4 text-left">
+                  <div className="w-12 h-12 rounded-[12px] bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                    <Radio className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-default-500">Online now</div>
+                    <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5 w-fit">
+                      <div className="text-2xl font-bold tracking-tight text-emerald-500">
+                        {stats ? stats.online_now : "—"}
+                      </div>
+                    </Skeleton>
+                  </div>
                 </div>
               </CardBody>
             </Card>
 
             {/* 6. Logins Today */}
-            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
-              <CardBody className="p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-[10px] bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs font-medium text-default-400">Logins today</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
-                    <div className="text-2xl font-bold tracking-tight text-foreground">
-                      {stats ? stats.logins_today : "—"}
-                    </div>
-                  </Skeleton>
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px] hover:border-default-300 transition-colors">
+              <CardBody className="p-4 sm:p-5">
+                <div className="flex flex-row items-center gap-4 text-left">
+                  <div className="w-12 h-12 rounded-[12px] bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium text-default-500">Logins today</div>
+                    <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5 w-fit">
+                      <div className="text-2xl font-bold tracking-tight text-foreground">
+                        {stats ? stats.logins_today : "—"}
+                      </div>
+                    </Skeleton>
+                  </div>
                 </div>
               </CardBody>
             </Card>
