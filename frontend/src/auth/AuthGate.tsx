@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { useAuthStore } from "./authStore";
 import { LoginPage } from "./LoginPage";
 import { AdminDashboard } from "../admin/AdminDashboard";
+import { AppShell } from "../ui/AppShell";
 
 interface Props {
   children: React.ReactNode;
@@ -36,11 +37,15 @@ export const AuthGate: React.FC<Props> = ({ children }) => {
     return <LoginPage />;
   }
 
-  // 2. Role-based routing: Admin goes directly to AdminDashboard
+  // 2. Role-based routing: Admin goes directly to AdminDashboard wrapped in AppShell
   if (user.role === "admin") {
-    return <AdminDashboard />;
+    return (
+      <AppShell title="Admin">
+        <AdminDashboard />
+      </AppShell>
+    );
   }
 
-  // 3. Subscribers (role="user") go directly to App
-  return <>{children}</>;
+  // 3. Subscribers (role="user") go directly to App wrapped in AppShell
+  return <AppShell title="Flipkart Sheet Filler">{children}</AppShell>;
 };
