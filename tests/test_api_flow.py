@@ -71,7 +71,8 @@ def test_api_full_flow_compare_with_2_final():
     # HSN: 2_final.xlsm incorrectly put SKU string in Col Y; our system sets the valid GST HSN 61091000
     # Group ID (Col H): 2_final.xlsm incorrectly assigned 'group 1' to all designs; now incremented per design group
     # Packer details (Col AC): 2_final.xlsm left empty; now populated
-    intentional_columns = {"AI", "BH", "BO", "BJ", "BF", "Y", "H", "AC"}
+    # Style Code (Col AQ): 2_final.xlsm left empty; now populated with SKU base name
+    intentional_columns = {"AI", "BH", "BO", "BJ", "BF", "Y", "H", "AC", "AQ"}
 
     unexpected_diffs = []
     for r in range(5, 37):
@@ -103,8 +104,10 @@ def test_api_full_flow_compare_with_2_final():
     # Verify Col H groups: Design 1 (rows 5..8) -> group 1, Design 2 (rows 9..12) -> group 2
     for r in range(5, 9):
         assert sh_out.cell(r, 8).value == "group 1"
+        assert sh_out.cell(r, 43).value == "tintin_os"
     for r in range(9, 13):
         assert sh_out.cell(r, 8).value == "group 2"
+        assert sh_out.cell(r, 43).value == "caribbean girl_os"
     for r in range(13, 17):
         assert sh_out.cell(r, 8).value == "group 3"
 

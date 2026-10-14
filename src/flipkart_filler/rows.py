@@ -263,7 +263,7 @@ def build_product_rows(
             "AN": int(defaults.get("pack_of", 1)),
             "AO": mapped_fit,
             "AP": str(defaults.get("suitable_for", "Western Wear")),
-            "AQ": str(product.style_code),
+            "AQ": str(product.style_code or "").strip() or sku_base,
             "AR": size,
             "AS": mapped_color,
             "AT": brand_color_val,

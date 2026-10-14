@@ -537,6 +537,11 @@ def build_design_rows(
     else:
         group_id_val = f"group {group_num}"
 
+    # Style Code (Col AQ): take base name from SKU ID (sku_base) for the group if not specified
+    raw_style = str(json_data.get("style_code") or "").strip()
+    exist_style = str(design.existing_values.get("AQ") or "").strip()
+    style_code_val = raw_style or exist_style or sku_base
+
     for size in sizes:
         sku = f"{sku_base}_{size}"
 
@@ -580,7 +585,7 @@ def build_design_rows(
             "AN": int(design.existing_values.get("AN", defaults.get("pack_of", 1))),
             "AO": mapped_fit,
             "AP": str(design.existing_values.get("AP", defaults.get("suitable_for", "Western Wear"))),
-            "AQ": str(json_data.get("style_code") or design.existing_values.get("AQ") or ""),
+            "AQ": style_code_val,
             "AR": size,
             "AS": mapped_color,
             "AT": brand_color_val,
