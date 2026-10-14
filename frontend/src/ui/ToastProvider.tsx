@@ -50,9 +50,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const addToast = useCallback(
-    ({ type, title, message, duration = 3500 }: Omit<ToastMessage, "id">) => {
+    ({ type, title, message, duration = 3000 }: Omit<ToastMessage, "id">) => {
       const id = Math.random().toString(36).substring(2, 9);
-      setToasts((prev) => [...prev, { id, type, title, message, duration }]);
+      setToasts((prev) => [...prev.slice(-2), { id, type, title, message, duration }]);
 
       if (duration > 0) {
         setTimeout(() => {
@@ -91,8 +91,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
       default:
         return {
-          bg: "bg-blue-50 dark:bg-blue-950/80 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100",
-          icon: <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />,
+          bg: "bg-indigo-50 dark:bg-indigo-950/80 border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-100",
+          icon: <Info className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />,
         };
     }
   };
@@ -100,14 +100,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none px-2 sm:px-0">
+      <div className="fixed bottom-4 right-4 max-sm:top-4 max-sm:bottom-auto max-sm:left-4 max-sm:right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map((t) => {
           const { bg, icon } = getToastStyles(t.type);
           return (
             <div
               key={t.id}
               role="alert"
-              className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border shadow-lg backdrop-blur-md transition-all duration-200 ease-out translate-y-0 opacity-100 ${bg}`}
+              className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-[14px] border shadow-lg backdrop-blur-md transition-all duration-200 ease-out translate-y-0 opacity-100 ${bg}`}
             >
               <div className="mt-0.5">{icon}</div>
               <div className="flex-1 min-w-0">

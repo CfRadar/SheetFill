@@ -402,15 +402,15 @@ export const AdminDashboard: React.FC = () => {
           {/* 6 Metric Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* 1. Total Subscribers */}
-            <Card shadow="sm" className="border border-divider bg-content1">
-              <CardBody className="p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Users className="w-6 h-6" />
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
+              <CardBody className="p-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-[10px] bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-default-500">Total subscribers</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-1">
-                    <div className="text-2xl font-black text-foreground">
+                  <div className="text-xs font-medium text-default-400">Total subscribers</div>
+                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
+                    <div className="text-2xl font-bold tracking-tight text-foreground">
                       {stats ? stats.total_users : "—"}
                     </div>
                   </Skeleton>
@@ -419,15 +419,15 @@ export const AdminDashboard: React.FC = () => {
             </Card>
 
             {/* 2. Active Subscriptions */}
-            <Card shadow="sm" className="border border-divider bg-content1">
-              <CardBody className="p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-success/10 text-success flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-6 h-6" />
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
+              <CardBody className="p-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-[10px] bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-default-500">Active subscriptions</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-1">
-                    <div className="text-2xl font-black text-success">
+                  <div className="text-xs font-medium text-default-400">Active subscriptions</div>
+                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
+                    <div className="text-2xl font-bold tracking-tight text-emerald-500">
                       {stats ? stats.active_subscriptions : "—"}
                     </div>
                   </Skeleton>
@@ -436,15 +436,15 @@ export const AdminDashboard: React.FC = () => {
             </Card>
 
             {/* 3. Expiring Soon */}
-            <Card shadow="sm" className="border border-divider bg-content1">
-              <CardBody className="p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-warning/10 text-warning flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-6 h-6" />
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
+              <CardBody className="p-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-[10px] bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-default-500">Expiring in 7 days</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-1">
-                    <div className="text-2xl font-black text-warning">
+                  <div className="text-xs font-medium text-default-400">Expiring in 7 days</div>
+                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
+                    <div className="text-2xl font-bold tracking-tight text-amber-500">
                       {stats ? stats.expiring_soon : "—"}
                     </div>
                   </Skeleton>
@@ -453,15 +453,15 @@ export const AdminDashboard: React.FC = () => {
             </Card>
 
             {/* 4. Expired Accounts */}
-            <Card shadow="sm" className="border border-divider bg-content1">
-              <CardBody className="p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-danger/10 text-danger flex items-center justify-center shrink-0">
-                  <XCircle className="w-6 h-6" />
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
+              <CardBody className="p-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-[10px] bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                  <XCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-default-500">Expired accounts</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-1">
-                    <div className="text-2xl font-black text-danger">
+                  <div className="text-xs font-medium text-default-400">Expired accounts</div>
+                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
+                    <div className="text-2xl font-bold tracking-tight text-rose-500">
                       {stats ? stats.expired : "—"}
                     </div>
                   </Skeleton>
@@ -470,15 +470,15 @@ export const AdminDashboard: React.FC = () => {
             </Card>
 
             {/* 5. Online Now */}
-            <Card shadow="sm" className="border border-divider bg-content1">
-              <CardBody className="p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-success/10 text-success flex items-center justify-center shrink-0">
-                  <Radio className="w-6 h-6 animate-pulse" />
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
+              <CardBody className="p-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-[10px] bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                  <Radio className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-default-500">Online now</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-1">
-                    <div className="text-2xl font-black text-success">
+                  <div className="text-xs font-medium text-default-400">Online now</div>
+                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
+                    <div className="text-2xl font-bold tracking-tight text-emerald-500">
                       {stats ? stats.online_now : "—"}
                     </div>
                   </Skeleton>
@@ -487,15 +487,15 @@ export const AdminDashboard: React.FC = () => {
             </Card>
 
             {/* 6. Logins Today */}
-            <Card shadow="sm" className="border border-divider bg-content1">
-              <CardBody className="p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Sparkles className="w-6 h-6" />
+            <Card shadow="none" className="border border-divider bg-content1 rounded-[14px]">
+              <CardBody className="p-5 flex items-center gap-4">
+                <div className="w-11 h-11 rounded-[10px] bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-default-500">Logins today</div>
-                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-1">
-                    <div className="text-2xl font-black text-foreground">
+                  <div className="text-xs font-medium text-default-400">Logins today</div>
+                  <Skeleton isLoaded={!isStatsLoading} className="rounded-lg mt-0.5">
+                    <div className="text-2xl font-bold tracking-tight text-foreground">
                       {stats ? stats.logins_today : "—"}
                     </div>
                   </Skeleton>
@@ -573,14 +573,13 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Subscribers Table */}
-          <Card shadow="sm" className="border border-divider bg-content1 overflow-hidden">
+          <Card shadow="none" className="border border-divider bg-content1 rounded-[14px] overflow-hidden">
             <Table
               aria-label="Subscribers list table"
-              isStriped
               classNames={{
                 wrapper: "p-0 shadow-none bg-transparent",
-                th: "bg-content2 text-default-600 font-semibold text-xs py-3",
-                td: "py-3 text-xs",
+                th: "bg-content2/70 text-default-400 font-semibold text-[11px] uppercase tracking-wider py-3 border-b border-divider",
+                td: "py-3 text-xs border-b border-divider/40 group-hover:bg-content2/20 transition-colors",
               }}
             >
               <TableHeader>
@@ -596,7 +595,7 @@ export const AdminDashboard: React.FC = () => {
                 emptyContent="No subscriber accounts found."
               >
                 {users.map((u) => (
-                  <TableRow key={u.id}>
+                  <TableRow key={u.id} className="hover:bg-content2/30 transition-colors">
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <div className="relative">
@@ -604,7 +603,7 @@ export const AdminDashboard: React.FC = () => {
                             {u.username.substring(0, 2).toUpperCase()}
                           </div>
                           {u.is_online && (
-                            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-success border-2 border-content1 rounded-full animate-pulse" />
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border-2 border-content1 rounded-full animate-pulse" />
                           )}
                         </div>
                         <div>
@@ -756,14 +755,13 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Activity Table */}
-          <Card shadow="sm" className="border border-divider bg-content1 overflow-hidden">
+          <Card shadow="none" className="border border-divider bg-content1 rounded-[14px] overflow-hidden">
             <Table
               aria-label="Activity logs table"
-              isStriped
               classNames={{
                 wrapper: "p-0 shadow-none bg-transparent",
-                th: "bg-content2 text-default-600 font-semibold text-xs py-3",
-                td: "py-3 text-xs",
+                th: "bg-content2/70 text-default-400 font-semibold text-[11px] uppercase tracking-wider py-3 border-b border-divider",
+                td: "py-3 text-xs border-b border-divider/40 group-hover:bg-content2/20 transition-colors",
               }}
             >
               <TableHeader>
@@ -776,7 +774,7 @@ export const AdminDashboard: React.FC = () => {
               </TableHeader>
               <TableBody isLoading={isLogsLoading} emptyContent="No activity logs found.">
                 {logs.map((l) => (
-                  <TableRow key={l.id}>
+                  <TableRow key={l.id} className="hover:bg-content2/30 transition-colors">
                     <TableCell>
                       <span className="font-mono text-default-500 whitespace-nowrap text-[11px]">
                         {new Date(l.ts).toLocaleString([], {
@@ -825,13 +823,29 @@ export const AdminDashboard: React.FC = () => {
       {/* =================================================================== */}
       {/* MODAL: CREATE SUBSCRIBER */}
       {/* =================================================================== */}
-      <Modal isOpen={isCreateOpen} onOpenChange={onCreateOpenChange} size="md" backdrop="blur">
+      <Modal
+        isOpen={isCreateOpen}
+        onOpenChange={onCreateOpenChange}
+        size="md"
+        backdrop="blur"
+        classNames={{
+          base: "rounded-[14px] border border-divider bg-content1 shadow-xl",
+          header: "border-b border-divider py-4 px-6",
+          body: "p-6",
+          footer: "border-t border-divider py-3.5 px-6",
+        }}
+      >
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex items-center gap-2 border-b border-divider py-3.5 px-6">
-                <Users className="w-5 h-5 text-primary" />
-                <h3 className="text-base font-semibold text-foreground">Create subscriber account</h3>
+              <ModalHeader className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-[8px] bg-primary/10 flex items-center justify-center text-primary">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Create subscriber account</h3>
+                  <p className="text-xs text-default-400 font-normal">Issue credentials with expiration</p>
+                </div>
               </ModalHeader>
 
               <ModalBody className="p-6">
@@ -970,18 +984,29 @@ export const AdminDashboard: React.FC = () => {
       {/* =================================================================== */}
       {/* MODAL: ACTION CONFIRMATION (Delete, Force Logout, Suspend) */}
       {/* =================================================================== */}
-      <Modal isOpen={isConfirmOpen} onOpenChange={onConfirmOpenChange} size="sm" backdrop="blur">
+      <Modal
+        isOpen={isConfirmOpen}
+        onOpenChange={onConfirmOpenChange}
+        size="sm"
+        backdrop="blur"
+        classNames={{
+          base: "rounded-[14px] border border-divider bg-content1 shadow-xl",
+          header: "border-b border-divider py-4 px-6",
+          body: "p-6",
+          footer: "border-t border-divider py-3 px-6",
+        }}
+      >
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="text-base font-semibold">
+              <ModalHeader className="text-base font-semibold text-foreground">
                 {confirmConfig?.title || "Confirm action"}
               </ModalHeader>
-              <ModalBody className="text-sm text-default-600">
+              <ModalBody className="text-xs text-default-500 leading-relaxed">
                 {confirmConfig?.message}
               </ModalBody>
               <ModalFooter>
-                <Button size="sm" variant="light" onPress={onClose}>
+                <Button size="sm" variant="light" onPress={onClose} className="rounded-[10px] text-xs font-medium">
                   Cancel
                 </Button>
                 <Button
@@ -989,6 +1014,7 @@ export const AdminDashboard: React.FC = () => {
                   color={confirmConfig?.danger ? "danger" : "primary"}
                   isLoading={isActionExecuting}
                   onPress={() => executeConfirmedAction(onClose)}
+                  className="rounded-[10px] text-xs font-semibold px-4 h-9"
                 >
                   {confirmConfig?.actionLabel || "Confirm"}
                 </Button>

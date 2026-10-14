@@ -99,16 +99,27 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
       size="3xl"
       backdrop="blur"
       scrollBehavior="inside"
+      classNames={{
+        base: "rounded-[14px] border border-divider bg-content1 shadow-xl",
+        header: "border-b border-divider py-4 px-6",
+        body: "p-6",
+        footer: "border-t border-divider py-3.5 px-6",
+      }}
     >
       <ModalContent>
         {() => (
           <>
-            <ModalHeader className="flex items-center justify-between gap-3 border-b border-divider py-3.5 px-6">
-              <div className="flex items-center gap-2">
-                <ClipboardPaste className="w-5 h-5 text-primary" />
-                <h3 className="text-base font-bold text-foreground">Paste all product JSONs</h3>
+            <ModalHeader className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-[8px] bg-primary/10 flex items-center justify-center text-primary">
+                  <ClipboardPaste className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">Paste all product JSONs</h3>
+                  <p className="text-xs text-default-400 font-normal mt-0.5">Bulk correlation across design slots</p>
+                </div>
               </div>
-              <Chip size="sm" variant="flat" color="primary" className="font-medium text-xs">
+              <Chip size="sm" variant="flat" color="primary" className="font-medium text-xs rounded-full">
                 Multi-design matching
               </Chip>
             </ModalHeader>
@@ -151,26 +162,26 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
                   </div>
 
                   {/* Assignments Table */}
-                  <div className="border border-divider rounded-xl overflow-hidden text-xs">
+                  <div className="border border-divider rounded-[12px] overflow-hidden text-xs">
                     <table className="w-full text-left">
-                      <thead className="bg-content2/60 border-b border-divider text-default-600 font-semibold">
+                      <thead className="bg-content2/70 border-b border-divider text-default-400 font-semibold text-[11px] uppercase tracking-wider">
                         <tr>
-                          <th className="p-3">JSON Title / Base</th>
-                          <th className="p-3">Matched Design Slot</th>
-                          <th className="p-3">Method</th>
-                          <th className="p-3">Confidence</th>
+                          <th className="py-2.5 px-3">JSON Title / Base</th>
+                          <th className="py-2.5 px-3">Matched Design Slot</th>
+                          <th className="py-2.5 px-3">Method</th>
+                          <th className="py-2.5 px-3">Confidence</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-divider">
                         {matchResult.assigned.map((a, i) => (
-                          <tr key={i} className="hover:bg-content2/40 transition-colors">
-                            <td className="p-3 font-medium text-foreground">
+                          <tr key={i} className="hover:bg-content2/30 transition-colors">
+                            <td className="py-2.5 px-3 font-medium text-foreground">
                               {a.json_base || a.parsed_json?.product_title || `#${a.json_index + 1}`}
                             </td>
-                            <td className="p-3 font-bold text-primary">
+                            <td className="py-2.5 px-3 font-bold text-primary">
                               {a.design_base || a.design_id}
                             </td>
-                            <td className="p-3">
+                            <td className="py-2.5 px-3">
                               <Chip
                                 size="sm"
                                 variant="flat"
@@ -186,7 +197,7 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
                                 {a.how}
                               </Chip>
                             </td>
-                            <td className="p-3 text-default-500 font-mono">
+                            <td className="py-2.5 px-3 text-default-500 font-mono">
                               {Math.round(a.confidence * 100)}%
                             </td>
                           </tr>
@@ -195,12 +206,12 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
                         {/* Unmatched JSON items */}
                         {matchResult.unmatched_json.map((u) => (
                           <tr key={u.json_index} className="bg-danger-50/20 dark:bg-danger-950/20">
-                            <td className="p-3 font-medium text-danger">
+                            <td className="py-2.5 px-3 font-medium text-danger">
                               {u.parsed_json?.sku_base ||
                                 u.parsed_json?.product_title ||
                                 `JSON #${u.json_index + 1}`}
                             </td>
-                            <td className="p-3" colSpan={3}>
+                            <td className="py-2.5 px-3" colSpan={3}>
                               <div className="flex items-center gap-2">
                                 <span className="text-[11px] text-danger font-medium whitespace-nowrap">
                                   Unmatched. Assign to:
@@ -213,7 +224,7 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
                                       [u.json_index]: e.target.value,
                                     })
                                   }
-                                  className="text-xs p-1.5 rounded-lg border border-divider bg-content1 text-foreground"
+                                  className="text-xs p-1.5 rounded-[8px] border border-divider bg-content1 text-foreground"
                                 >
                                   <option value="">-- Choose Design Slot --</option>
                                   {session.designs.map((d) => (
@@ -233,8 +244,8 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
               )}
             </ModalBody>
 
-            <ModalFooter className="border-t border-divider py-3 px-6 flex items-center justify-between">
-              <Button size="sm" variant="light" onPress={handleClose}>
+            <ModalFooter className="flex items-center justify-between">
+              <Button size="sm" variant="light" onPress={handleClose} className="rounded-[10px] text-xs font-medium">
                 Cancel
               </Button>
               {!matchResult ? (
@@ -245,7 +256,7 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
                   isDisabled={!rawText.trim()}
                   startContent={!isProcessing && <Sparkles className="w-3.5 h-3.5" />}
                   onPress={handleMatch}
-                  className="font-semibold"
+                  className="font-semibold rounded-[10px] text-xs h-9 px-4"
                 >
                   Analyze & match
                 </Button>
@@ -255,7 +266,7 @@ export const BulkPasteDialog: React.FC<BulkPasteDialogProps> = ({ isOpen, onClos
                   color="success"
                   isLoading={isProcessing}
                   onPress={handleConfirm}
-                  className="font-semibold text-white shadow-sm"
+                  className="font-semibold text-white shadow-sm rounded-[10px] text-xs h-9 px-4"
                 >
                   Apply all matches
                 </Button>
