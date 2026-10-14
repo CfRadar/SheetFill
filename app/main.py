@@ -10,6 +10,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import sys
+from pathlib import Path
+
+# Ensure local 'src' directory containing flipkart_filler is on python path
+_src_dir = str(Path(__file__).resolve().parent.parent / "src")
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+
 from app.admin import router as admin_router
 from app.api.sheets import router as sheets_router
 from app.auth import router as auth_router
