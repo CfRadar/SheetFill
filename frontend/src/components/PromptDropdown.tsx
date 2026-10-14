@@ -1,14 +1,6 @@
 import React, { useState } from "react";
-import {
-  Button,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure,
-} from "@heroui/react";
-import { Copy, Check, FileText } from "lucide-react";
+import { Button } from "@heroui/react";
+import { Check, FileText } from "lucide-react";
 import { toast } from "../ui/ToastProvider";
 
 export const FLIPKART_TSHIRT_PROMPT = `You are a Flipkart catalog specialist. I have uploaded 6 images of ONE oversized black women's T-shirt design. Return ONLY a valid JSON object (no markdown fences, no explanation) that follows the EXAMPLE below exactly in structure, length and writing style.
@@ -78,7 +70,6 @@ TASK
 Now produce the JSON for the uploaded design. Keep every fixed field exactly as in the example (material, sleeve_type, neck_type, fit_type, ideal_for, color, brand_color, occasion, style_code, fabric_care, print_coverage, sleeve_details, detail_placement_rows, and the whole template text of description_override). Change only what depends on the design: the print wording in product_description and key_features[0], pattern, search_keywords, key_features_sheet[0], surface_styling, tee_length, detail_placement and "Print Placement". Output the JSON only.`;
 
 export const PromptDropdown: React.FC = () => {
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = async () => {
@@ -102,62 +93,31 @@ export const PromptDropdown: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy prompt:", err);
+      toast.error("Failed to copy prompt");
     }
   };
 
   return (
-    <>
-      <Button
-        size="sm"
-        variant="flat"
-        color="default"
-        onPress={onOpen}
-        startContent={copied ? <Check className="w-3.5 h-3.5 text-success" /> : <FileText className="w-3.5 h-3.5 text-default-500" />}
-        className="h-9 px-3 rounded-[10px] font-medium text-xs text-foreground bg-content3 hover:bg-default-200 border border-divider transition-colors"
-      >
-        Prompt
-      </Button>
-
-      {/* HeroUI Prompt Viewer Modal */}
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="2xl" scrollBehavior="inside">
-        <ModalContent className="rounded-[14px] border border-divider bg-content1 shadow-xl">
-          {(onClose) => (
-            <>
-              <ModalHeader className="flex items-center justify-between border-b border-divider py-3.5 px-5">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
-                  <span className="text-sm font-semibold text-foreground">Flipkart Catalog Prompt Template</span>
-                </div>
-              </ModalHeader>
-              <ModalBody className="p-5 space-y-3">
-                <p className="text-xs text-default-500">
-                  Pass this prompt along with 6 product images to your AI vision model to generate schema-compliant JSON:
-                </p>
-                <div className="p-4 rounded-[10px] bg-content3 border border-divider font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap select-all max-h-[50vh] overflow-y-auto">
-                  {FLIPKART_TSHIRT_PROMPT}
-                </div>
-              </ModalBody>
-              <ModalFooter className="border-t border-divider py-3 px-5 flex items-center justify-between">
-                <span className="text-[11px] text-default-400">Click inside to select all text</span>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="light" onPress={onClose} className="rounded-[10px]">
-                    Close
-                  </Button>
-                  <Button
-                    size="sm"
-                    color="primary"
-                    startContent={copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    onPress={copyToClipboard}
-                    className="rounded-[10px] font-semibold"
-                  >
-                    {copied ? "Copied!" : "Copy prompt"}
-                  </Button>
-                </div>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
-    </>
+    <Button
+      size="sm"
+      variant="flat"
+      color="default"
+      onPress={copyToClipboard}
+      startContent={
+        copied ? (
+          <Check className="w-3.5 h-3.5 text-success" />
+        ) : (
+          <FileText className="w-3.5 h-3.5 text-default-500" />
+        )
+      }
+      className={`h-9 px-3 rounded-[10px] font-medium text-xs border border-divider transition-all ${
+        copied
+          ? "bg-success/15 text-success border-success/30"
+          : "text-foreground bg-content3 hover:bg-default-200"
+      }`}
+      aria-label="Copy AI prompt template to clipboard"
+    >
+      {copied ? "Copied!" : "Prompt"}
+    </Button>
   );
 };
