@@ -46,6 +46,7 @@ class SessionResponse(BaseModel):
 class BrandMetaRequest(BaseModel):
     brand: Optional[str] = None
     manufacturer: Optional[str] = None
+    packer: Optional[str] = None
     hsn: Optional[str] = None
 
 

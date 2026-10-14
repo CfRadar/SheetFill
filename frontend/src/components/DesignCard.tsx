@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { deleteDesign, saveDesignImages, saveDesignSizes } from "../api";
 import { useAppStore } from "../store";
 import { DetectedDesign, PreviewRow } from "../types";
-import { BrandMetaEditor } from "./BrandMetaEditor";
 import { ImageLinksEditor } from "./ImageLinksEditor";
 import { JsonEditor } from "./JsonEditor";
 import { RowsPreview } from "./RowsPreview";
@@ -193,18 +192,6 @@ export const DesignCard: React.FC<DesignCardProps> = ({ design, index }) => {
             onSave={handleSaveImages}
           />
 
-          {/* Brand, Manufacturer & HSN Editor */}
-          {session && (
-            <BrandMetaEditor
-              sessionId={session.session_id}
-              design={design}
-              onMetaUpdated={(_meta, rows) => {
-                if (rows && rows.length > 0) {
-                  setPreviewRows(rows);
-                }
-              }}
-            />
-          )}
 
           {/* JSON Editor */}
           {session && (

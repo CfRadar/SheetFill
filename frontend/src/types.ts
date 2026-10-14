@@ -49,6 +49,7 @@ export interface SessionState {
 export interface BrandMeta {
   brand?: string;
   manufacturer?: string;
+  packer?: string;
   hsn?: string;
 }
 

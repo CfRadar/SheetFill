@@ -41,7 +41,7 @@ def test_same_across_sizes(mapper, moonlight_design, sample_json):
     # Section 5 Design-level columns
     design_level_cols = [
         "H", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X",
-        "Z", "AA", "AB", "AE", "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN", "AO", "AP",
+        "Z", "AA", "AB", "AC", "AE", "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN", "AO", "AP",
         "AQ", "AS", "AT", "AU", "AV", "AW", "AX", "AY", "AZ", "BA", "BE", "BF", "BG",
         "BH", "BJ", "BK", "BM", "BN", "BO"
     ]
@@ -57,6 +57,7 @@ def test_same_across_sizes(mapper, moonlight_design, sample_json):
         assert rows[i].get("AR") == size
         assert rows[i].get("G") == f"{moonlight_design.base}_{size}"
         assert rows[i].get("Y") == "61091000"
+
 
     # Detail placement BD written on S only by default
     assert rows[0].get("BD") is not None
@@ -92,11 +93,12 @@ def test_duplicate_sku_blocked(mapper, moonlight_design, sample_json):
     assert any("Duplicate Seller SKU ID" in e.message for e in b_res.errors)
 
 
-def test_meta_override_brand_manufacturer_hsn(mapper, moonlight_design, sample_json):
+def test_meta_override_brand_manufacturer_packer_hsn(mapper, moonlight_design, sample_json):
     existing_skus = set()
     meta = {
         "brand": "Custom Brand Apparel",
         "manufacturer": "Custom Textiles Pvt Ltd, Surat",
+        "packer": "Custom Packers Logistics, Surat",
         "hsn": "61099010",
     }
     b_res = build_design_rows(
@@ -106,5 +108,29 @@ def test_meta_override_brand_manufacturer_hsn(mapper, moonlight_design, sample_j
     for r in b_res.rows:
         assert r.get("AG") == "Custom Brand Apparel"
         assert r.get("AB") == "Custom Textiles Pvt Ltd, Surat"
+        assert r.get("AC") == "Custom Packers Logistics, Surat"
         assert r.get("Y") == "61099010"
+
+
+def test_group_id_assignment(mapper, moonlight_design, sample_json):
+    # When design.id is d1
+    b_res1 = build_design_rows(moonlight_design, sample_json, mapper, set(), design_index=1)
+    assert b_res1.status == "ready"
+    for r in b_res1.rows:
+        assert r.get("H") == "group 1"
+
+    # When design_index is 2
+    b_res2 = build_design_rows(moonlight_design, sample_json, mapper, set(), design_index=2)
+    assert b_res2.status == "ready"
+    for r in b_res2.rows:
+        assert r.get("H") == "group 2"
+
+    # When custom group_id is provided in meta
+    b_res3 = build_design_rows(
+        moonlight_design, sample_json, mapper, set(), meta_override={"group_id": "group 5"}
+    )
+    assert b_res3.status == "ready"
+    for r in b_res3.rows:
+        assert r.get("H") == "group 5"
+
 

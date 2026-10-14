@@ -303,6 +303,24 @@ export async function applyMetaToAll(
   return res.json();
 }
 
+export async function saveUserBrandDefaults(defaults: {
+  brand?: string;
+  manufacturer?: string;
+  packer?: string;
+}): Promise<any> {
+  const res = await authFetch(`${BASE_URL}/auth/brand-defaults`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(defaults),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || "Failed to save user brand defaults");
+  }
+  return res.json();
+}
+
+
 // --------------------------------------------------------------------------
 // Admin Management API Functions
 // --------------------------------------------------------------------------

@@ -26,7 +26,6 @@ import { useAppStore } from "../store";
 import { DetectedDesign, PreviewRow } from "../types";
 import { StatusChip } from "../ui/StatusChip";
 import { JsonEditor } from "../components/JsonEditor";
-import { BrandMetaEditor } from "../components/BrandMetaEditor";
 import { ImageLinksEditor } from "../components/ImageLinksEditor";
 import { RowsPreview } from "../components/RowsPreview";
 import { toast } from "../ui/ToastProvider";
@@ -59,7 +58,6 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     resolveDesignSizes(session?.design_sizes[design.id], design.sizes_found)
   );
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
-  const [isBrandMetaExpanded, setIsBrandMetaExpanded] = useState(false);
   const [isImagesExpanded, setIsImagesExpanded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -118,9 +116,6 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       ? `row ${design.sheet_rows[0]}`
       : "manual slot";
 
-  const currentMeta = session?.design_meta?.[design.id] || session?.global_meta || {};
-  const currentBrand = currentMeta.brand || design.existing_values?.["AG"] || "fashion continental";
-  const currentHsn = currentMeta.hsn || design.existing_values?.["Y"] || "61091000";
   const imagesCount = (session?.design_image_edits[design.id] || design.image_urls).filter(Boolean).length;
 
   return (
@@ -292,55 +287,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         </CardBody>
       </Card>
 
-      {/* 4. Secondary Section: Brand & HSN (Clean summary row) */}
-      <Card shadow="sm" className="border border-divider bg-content1 rounded-[14px] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setIsBrandMetaExpanded(!isBrandMetaExpanded)}
-          className="w-full p-4 sm:p-5 flex items-center justify-between hover:bg-content3/50 transition-colors text-left focus:outline-none"
-        >
-          <div className="flex items-center gap-3">
-            <Tag className="w-4 h-4 text-default-400" />
-            <div>
-              <span className="text-sm font-semibold text-foreground">
-                Brand & HSN details
-              </span>
-              <p className="text-xs text-default-400 mt-0.5">
-                Brand: <strong className="text-foreground font-medium">{currentBrand}</strong> • HSN:{" "}
-                <strong className="text-foreground font-medium">{currentHsn}</strong>
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-primary font-medium">
-              {isBrandMetaExpanded ? "Collapse" : "Edit"}
-            </span>
-            <ChevronDown
-              className={`w-4 h-4 text-default-400 transition-transform duration-200 ${
-                isBrandMetaExpanded ? "rotate-180" : ""
-              }`}
-            />
-          </div>
-        </button>
-
-        {isBrandMetaExpanded && session && (
-          <div className="p-5 border-t border-divider bg-content2/40 transition-all duration-200">
-            <BrandMetaEditor
-              sessionId={session.session_id}
-              design={design}
-              onMetaUpdated={(newMeta) => {
-                if (session) {
-                  if (!session.design_meta) session.design_meta = {};
-                  session.design_meta[design.id] = newMeta;
-                  setSession({ ...session });
-                }
-              }}
-            />
-          </div>
-        )}
-      </Card>
-
-      {/* 5. Secondary Section: Image Links (Clean summary row) */}
+      {/* 4. Secondary Section: Image Links (Clean summary row) */}
       <Card shadow="sm" className="border border-divider bg-content1 rounded-[14px] overflow-hidden">
         <button
           type="button"

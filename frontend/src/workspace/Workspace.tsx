@@ -4,6 +4,7 @@ import { StickyToolbar } from "./StickyToolbar";
 import { DesignListSidebar } from "./DesignListSidebar";
 import { DesignEditor } from "./DesignEditor";
 import { BulkPasteDialog } from "../components/BulkPasteDialog";
+import { GlobalBrandBar } from "../components/GlobalBrandBar";
 import { ReportPanel } from "../components/ReportPanel";
 import { EmptyState } from "../ui/EmptyState";
 import { PageFade } from "../ui/PageFade";
@@ -75,7 +76,12 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
         </div>
       )}
 
-      {/* Main Workspace Body: Container max-w-7xl with 24px top spacing, no black gap */}
+      {/* Global Brand, Manufacturer & Packer Details Bar (On top, filled once) */}
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pt-4">
+        <GlobalBrandBar sessionId={session.session_id} />
+      </div>
+
+      {/* Main Workspace Body: Container max-w-7xl with top spacing */}
       {designs.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-8">
           <EmptyState

@@ -1,5 +1,6 @@
 """Builder service for merging JSON, stub values, and defaults into RowRecords."""
 
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import BaseModel, Field
@@ -49,6 +50,7 @@ def build_design_rows(
     product_link_edit: Optional[str] = None,
     existing_urls_by_design: Optional[Dict[str, str]] = None,
     meta_override: Optional[Dict[str, str]] = None,
+    design_index: Optional[int] = None,
 ) -> BuildResult:
     """Builds size rows for a single design adhering strictly to Section 5 rules."""
     errors: List[ValidationIssue] = []
@@ -80,7 +82,6 @@ def build_design_rows(
     else:
         # Orphan or manual slot without stub_base in sheet
         if not json_base:
-            import re
             style_code = (json_data.get("style_code") or "").strip()
             title = (json_data.get("product_title") or "").strip()
             if style_code:
@@ -468,23 +469,39 @@ def build_design_rows(
         else design.existing_values.get("L", defaults.get("selling_price", 749))
     )
 
-    # Brand (Col AG), Manufacturer (Col AB), HSN (Col Y) resolution:
-    # Priority: meta_override > json_data > design.existing_values > defaults
+    # Brand (Col AG), Manufacturer (Col AB), Packer (Col AC) resolution:
+    # Priority: meta_override > json_data > (sheet existing_values if not template default) > defaults
+    exist_brand = str(design.existing_values.get("AG") or "").strip()
+    exist_mfg = str(design.existing_values.get("AB") or "").strip()
+    exist_packer = str(design.existing_values.get("AC") or "").strip()
+
+    meta_brand = (meta_override.get("brand") if meta_override else None)
+    meta_mfg = (meta_override.get("manufacturer") if meta_override else None)
+    meta_packer = (meta_override.get("packer") if meta_override else None)
+
     brand_val = (
-        (meta_override.get("brand") if meta_override else None)
+        (meta_brand if meta_brand and str(meta_brand).strip() else None)
         or json_data.get("brand")
-        or design.existing_values.get("AG")
+        or (exist_brand if exist_brand and exist_brand.lower() != "fashion continental" else None)
         or defaults.get("brand", "fashion continental")
     )
     brand_val = str(brand_val).strip()
 
     manufacturer_val = (
-        (meta_override.get("manufacturer") if meta_override else None)
+        (meta_mfg if meta_mfg and str(meta_mfg).strip() else None)
         or json_data.get("manufacturer")
-        or design.existing_values.get("AB")
+        or (exist_mfg if exist_mfg and exist_mfg.lower() != "fashion continental" else None)
         or defaults.get("manufacturer", "fashion continental")
     )
     manufacturer_val = str(manufacturer_val).strip()
+
+    packer_val = (
+        (meta_packer if meta_packer and str(meta_packer).strip() else None)
+        or json_data.get("packer")
+        or (exist_packer if exist_packer and exist_packer.lower() != "fashion continental" else None)
+        or manufacturer_val
+    )
+    packer_val = str(packer_val).strip()
 
     hsn_override = (
         (meta_override.get("hsn") if meta_override else None)
@@ -501,6 +518,25 @@ def build_design_rows(
         else:
             hsn_val = str(defaults.get("hsn_fixed") or "61091000").strip()
 
+    # Group ID: each design gets a unique group: group 1, group 2, group 3, ...
+    # Determine index from design_index if provided, or from design.id (e.g. "d1" -> 1, "d2" -> 2)
+    group_num = 1
+    if design_index is not None and design_index > 0:
+        group_num = design_index
+    else:
+        m = re.search(r"\d+", str(design.id))
+        if m:
+            group_num = int(m.group())
+
+    custom_group = (
+        (meta_override.get("group_id") if meta_override else None)
+        or json_data.get("group_id")
+    )
+    if custom_group and str(custom_group).strip():
+        group_id_val = str(custom_group).strip()
+    else:
+        group_id_val = f"group {group_num}"
+
     for size in sizes:
         sku = f"{sku_base}_{size}"
 
@@ -512,7 +548,7 @@ def build_design_rows(
 
         cells: Dict[str, Any] = {
             "G": sku,
-            "H": str(design.existing_values.get("H", defaults.get("group_id", "group 1"))),
+            "H": group_id_val,
             "J": str(design.existing_values.get("J", defaults.get("listing_status", "Active"))),
             "K": mrp_val,
             "L": sp_val,
@@ -532,6 +568,7 @@ def build_design_rows(
             "Z": float(design.existing_values.get("Z", defaults.get("luxury_cess", 0))),
             "AA": str(design.existing_values.get("AA", defaults.get("country_of_origin", "India"))),
             "AB": manufacturer_val,
+            "AC": packer_val,
             "AE": str(design.existing_values.get("AE", defaults.get("tax_code", "GST_APPAREL"))),
             "AG": brand_val,
             "AH": mapped_neck,

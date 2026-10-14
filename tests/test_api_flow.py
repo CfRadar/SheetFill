@@ -69,7 +69,9 @@ def test_api_full_flow_compare_with_2_final():
     # Surface styling: dynamic from description text
     # Tee length: 1_before.xls stub row 11 explicitly contains 'Long' while 2_final has 'Medium'
     # HSN: 2_final.xlsm incorrectly put SKU string in Col Y; our system sets the valid GST HSN 61091000
-    intentional_columns = {"AI", "BH", "BO", "BJ", "BF", "Y"}
+    # Group ID (Col H): 2_final.xlsm incorrectly assigned 'group 1' to all designs; now incremented per design group
+    # Packer details (Col AC): 2_final.xlsm left empty; now populated
+    intentional_columns = {"AI", "BH", "BO", "BJ", "BF", "Y", "H", "AC"}
 
     unexpected_diffs = []
     for r in range(5, 37):
@@ -97,6 +99,19 @@ def test_api_full_flow_compare_with_2_final():
                 unexpected_diffs.append((r, col, s_exp, s_out))
 
     assert len(unexpected_diffs) == 0, f"Unexpected differences found: {unexpected_diffs[:10]}"
+
+    # Verify Col H groups: Design 1 (rows 5..8) -> group 1, Design 2 (rows 9..12) -> group 2
+    for r in range(5, 9):
+        assert sh_out.cell(r, 8).value == "group 1"
+    for r in range(9, 13):
+        assert sh_out.cell(r, 8).value == "group 2"
+    for r in range(13, 17):
+        assert sh_out.cell(r, 8).value == "group 3"
+
+    # Verify Col AC (Packer details) is populated
+    for r in range(5, 37):
+        assert sh_out.cell(r, 29).value is not None and str(sh_out.cell(r, 29).value).strip() != ""
+
 
 
 def test_api_partial_run():

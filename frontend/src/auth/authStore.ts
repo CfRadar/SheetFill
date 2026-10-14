@@ -8,6 +8,11 @@ export interface CurrentUser {
   role: "user" | "admin";
   access_expires_at?: string | null;
   days_left?: number | null;
+  brand_defaults?: {
+    brand?: string;
+    manufacturer?: string;
+    packer?: string;
+  } | null;
 }
 
 interface AuthState {
@@ -203,6 +208,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         role: data.role,
         access_expires_at: data.access_expires_at,
         days_left: data.days_left,
+        brand_defaults: data.brand_defaults,
       };
       get().setUser(updatedUser);
       return true;

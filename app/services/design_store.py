@@ -276,10 +276,11 @@ class DesignStore:
         design_id: str,
         brand: Optional[str] = None,
         manufacturer: Optional[str] = None,
+        packer: Optional[str] = None,
         hsn: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
-        """Updates brand, manufacturer, and HSN for a specific design."""
+        """Updates brand, manufacturer, packer, and HSN for a specific design."""
         state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
@@ -289,6 +290,8 @@ class DesignStore:
             cur["brand"] = brand.strip()
         if manufacturer is not None:
             cur["manufacturer"] = manufacturer.strip()
+        if packer is not None:
+            cur["packer"] = packer.strip()
         if hsn is not None:
             cur["hsn"] = hsn.strip()
         state.design_meta[design_id] = cur
@@ -301,10 +304,11 @@ class DesignStore:
         session_id: str,
         brand: Optional[str] = None,
         manufacturer: Optional[str] = None,
+        packer: Optional[str] = None,
         hsn: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
-        """Applies brand, manufacturer, and HSN to all designs and updates global_meta."""
+        """Applies brand, manufacturer, packer, and HSN to all designs and updates global_meta."""
         state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
@@ -314,6 +318,8 @@ class DesignStore:
             meta["brand"] = brand.strip()
         if manufacturer is not None:
             meta["manufacturer"] = manufacturer.strip()
+        if packer is not None:
+            meta["packer"] = packer.strip()
         if hsn is not None:
             meta["hsn"] = hsn.strip()
 

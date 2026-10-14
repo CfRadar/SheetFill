@@ -38,6 +38,7 @@ def build_product_rows(
     mapper: ValueMapper,
     existing_skus: Set[str],
     source_sheet_data: Optional[Dict[str, Any]] = None,
+    product_index: Optional[int] = None,
 ) -> Tuple[List[RowRecord], List[ValidationIssue]]:
     """Generates 4 rows (one per size) for a product, validating attributes and constraints.
     Returns (list_of_4_RowRecords, list_of_issues).
@@ -222,9 +223,14 @@ def build_product_rows(
         handling = defaults.get("handling_fees", {})
         pkg = defaults.get("package_cm", {})
 
+        group_val = str(defaults.get("group_id", f"group {product_index}" if product_index else "group 1"))
+        mfg_val = str(defaults.get("manufacturer", "fashion continental"))
+        packer_val = str(defaults.get("packer", mfg_val))
+        brand_val = str(defaults.get("brand", "fashion continental"))
+
         cells: Dict[str, Any] = {
             "G": sku,
-            "H": str(defaults.get("group_id", "group 1")),
+            "H": group_val,
             "J": str(defaults.get("listing_status", "Active")),
             "K": mrp_val,
             "L": sp_val,
@@ -243,11 +249,11 @@ def build_product_rows(
             "Y": hsn_val,
             "Z": float(defaults.get("luxury_cess", 0)),
             "AA": str(defaults.get("country_of_origin", "India")),
-            "AB": str(defaults.get("manufacturer", "fashion continental")),
-            # AC, AD empty
+            "AB": mfg_val,
+            "AC": packer_val,
             "AE": str(defaults.get("tax_code", "GST_APPAREL")),
             # AF empty
-            "AG": str(defaults.get("brand", "fashion continental")),
+            "AG": brand_val,
             "AH": mapped_neck,
             "AI": mapped_pattern,
             "AJ": mapped_fabric,

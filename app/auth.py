@@ -44,6 +44,7 @@ class CurrentUser(BaseModel):
     display_name: str
     access_expires_at: Optional[datetime] = None
     session_id: str
+    brand_defaults: Optional[Dict[str, str]] = None
 
 
 class LoginRequest(BaseModel):
@@ -71,6 +72,13 @@ class MeResponse(BaseModel):
     access_expires_at: Optional[str] = None
     days_left: Optional[int] = None
     session_id: str
+    brand_defaults: Optional[Dict[str, str]] = None
+
+
+class BrandDefaultsRequest(BaseModel):
+    brand: Optional[str] = None
+    manufacturer: Optional[str] = None
+    packer: Optional[str] = None
 
 
 def _auth_error(status_code: int, code: str, message: str, details: Any = None) -> HTTPException:
@@ -583,6 +591,7 @@ async def _get_current_authenticated_user(
             display_name=cached.get("display_name", cached.get("username", uid)),
             access_expires_at=acc_exp,
             session_id=sid,
+            brand_defaults=cached.get("brand_defaults"),
         )
 
     # 2. Cache miss -> query MongoDB
@@ -627,6 +636,8 @@ async def _get_current_authenticated_user(
                 "Your subscription has expired. Please contact owner to renew.",
             )
 
+    brand_defs = u_doc.get("brand_defaults")
+
     # Save to cache
     set_cached_session(
         sid,
@@ -641,6 +652,7 @@ async def _get_current_authenticated_user(
             "user_active": True,
             "access_expires_at": acc_exp,
             "last_seen_update": now,
+            "brand_defaults": brand_defs,
         },
     )
 
@@ -651,6 +663,7 @@ async def _get_current_authenticated_user(
         display_name=u_doc.get("display_name", u_doc.get("username", uid)),
         access_expires_at=acc_exp,
         session_id=sid,
+        brand_defaults=brand_defs,
     )
 
 
@@ -697,4 +710,27 @@ async def get_me(user: CurrentUser = Depends(_get_current_authenticated_user)) -
         access_expires_at=user.access_expires_at.isoformat() if user.access_expires_at else None,
         days_left=days_left,
         session_id=user.session_id,
+        brand_defaults=user.brand_defaults,
     )
+
+
+@router.put("/brand-defaults")
+async def update_brand_defaults(
+    req: BrandDefaultsRequest,
+    user: CurrentUser = Depends(_get_current_authenticated_user),
+) -> Any:
+    """Saves per-user brand, manufacturer, and packer defaults."""
+    defaults = {
+        "brand": (req.brand or "").strip(),
+        "manufacturer": (req.manufacturer or "").strip(),
+        "packer": (req.packer or "").strip(),
+    }
+    if is_db_connected():
+        db = get_db()
+        await db.users.update_one(
+            {"_id": ObjectId(user.id)},
+            {"$set": {"brand_defaults": defaults}},
+        )
+        invalidate_session(user.session_id)
+    return {"status": "ok", "brand_defaults": defaults}
+

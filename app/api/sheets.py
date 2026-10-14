@@ -102,6 +102,11 @@ async def analyze_sheet(
 
         detection_res = detect_designs(raw_sheet)
         session = store.create_session(filename, contents, detection_res, user_id=user.id)
+        if user.brand_defaults:
+            session.global_meta = dict(user.brand_defaults)
+            for d in session.designs:
+                session.design_meta[d.id] = dict(user.brand_defaults)
+            store.save_session(session)
 
         await log_event(
             event_type="upload_sheet",
@@ -127,6 +132,18 @@ def get_session_state(sid: str, user: CurrentUser = Depends(require_user)) -> An
     session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
+
+    if user.brand_defaults:
+        changed = False
+        if not session.global_meta:
+            session.global_meta = dict(user.brand_defaults)
+            changed = True
+        for d in session.designs:
+            if d.id not in session.design_meta:
+                session.design_meta[d.id] = dict(user.brand_defaults)
+                changed = True
+        if changed:
+            store.save_session(session)
 
     download_url = f"/api/sheets/{sid}/download" if session.output_filename else None
 
@@ -273,6 +290,7 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest, user: CurrentUser =
     meta_override = dict(session.global_meta or {})
     meta_override.update(session.design_meta.get(did, {}))
 
+    target_idx = next((i + 1 for i, d in enumerate(session.designs) if d.id == did), 1)
     b_res = build_design_rows(
         design=target_design,
         json_data=parsed_json,
@@ -282,6 +300,7 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest, user: CurrentUser =
         image_edits=image_edits,
         product_link_edit=prod_link_edit,
         meta_override=meta_override,
+        design_index=target_idx,
     )
 
     # Save to store
@@ -393,6 +412,7 @@ def put_design_meta(
         design_id=did,
         brand=req.brand,
         manufacturer=req.manufacturer,
+        packer=req.packer,
         hsn=req.hsn,
         user_id=user.id,
     )
@@ -405,6 +425,7 @@ def put_design_meta(
         mapper = get_default_mapper(_get_master_template_path())
         meta_override = dict(updated.global_meta or {})
         meta_override.update(updated.design_meta.get(did, {}))
+        target_idx = next((i + 1 for i, d in enumerate(updated.designs) if d.id == did), 1)
         b_res = build_design_rows(
             design=target_design,
             json_data=updated.design_jsons[did],
@@ -414,6 +435,7 @@ def put_design_meta(
             image_edits=updated.design_image_edits.get(did),
             product_link_edit=updated.design_product_links.get(did),
             meta_override=meta_override,
+            design_index=target_idx,
         )
         store.save_design_json(
             session_id=sid,
@@ -453,15 +475,37 @@ def apply_meta_all(
         session_id=sid,
         brand=req.brand,
         manufacturer=req.manufacturer,
+        packer=req.packer,
         hsn=req.hsn,
         user_id=user.id,
     )
     if not updated:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
+    # Persist brand defaults for the user so every new sheet remembers them
+    from app.db import get_db, is_db_connected
+    if is_db_connected():
+        try:
+            db = get_db()
+            updates = {}
+            if req.brand is not None:
+                updates["brand_defaults.brand"] = req.brand.strip()
+            if req.manufacturer is not None:
+                updates["brand_defaults.manufacturer"] = req.manufacturer.strip()
+            if req.packer is not None:
+                updates["brand_defaults.packer"] = req.packer.strip()
+            if updates:
+                import asyncio
+                from bson import ObjectId
+                from app.cache import invalidate_session
+                asyncio.create_task(db.users.update_one({"_id": ObjectId(user.id)}, {"$set": updates}))
+                invalidate_session(user.session_id)
+        except Exception:
+            pass
+
     # Re-evaluate all designs that have JSON
     mapper = get_default_mapper(_get_master_template_path())
-    for d in updated.designs:
+    for idx, d in enumerate(updated.designs, start=1):
         if d.id in updated.design_jsons:
             meta_override = dict(updated.global_meta or {})
             meta_override.update(updated.design_meta.get(d.id, {}))
@@ -474,6 +518,7 @@ def apply_meta_all(
                 image_edits=updated.design_image_edits.get(d.id),
                 product_link_edit=updated.design_product_links.get(d.id),
                 meta_override=meta_override,
+                design_index=idx,
             )
             store.save_design_json(
                 session_id=sid,
@@ -552,6 +597,7 @@ def bulk_confirm(
         jobj = pair.parsed_json or {}
         meta_override = dict(session.global_meta or {})
         meta_override.update(session.design_meta.get(did, {}))
+        target_idx = next((i + 1 for i, d in enumerate(session.designs) if d.id == did), 1)
 
         b_res = build_design_rows(
             design=target_design,
@@ -562,6 +608,7 @@ def bulk_confirm(
             image_edits=session.design_image_edits.get(did),
             product_link_edit=session.design_product_links.get(did),
             meta_override=meta_override,
+            design_index=target_idx,
         )
 
         store.save_design_json(
@@ -632,7 +679,7 @@ async def generate_workbook(
     existing_skus: Set[str] = set()
     blocked_or_invalid: List[str] = []
 
-    for d in session.designs:
+    for idx, d in enumerate(session.designs, start=1):
         if d.id in session.design_jsons:
             jobj = session.design_jsons[d.id]
             meta_override = dict(session.global_meta or {})
@@ -647,6 +694,7 @@ async def generate_workbook(
                 image_edits=session.design_image_edits.get(d.id),
                 product_link_edit=session.design_product_links.get(d.id),
                 meta_override=meta_override,
+                design_index=idx,
             )
             if b_res.status == "ready":
                 ready_rows_map[d.id] = b_res.rows
