@@ -6,7 +6,25 @@ A production-grade Python automation tool and local web application that populat
 
 ## 1. Quickstart
 
-### One-Click Startup
+### Using Make (Recommended)
+```bash
+# Start backend (automatically creates & activates venv and runs Uvicorn on http://127.0.0.1:8000)
+make backend
+
+# Start frontend (installs npm dependencies if needed and runs Vite on http://localhost:3000)
+make frontend
+
+# Start unified app (builds frontend if needed and serves UI + API on http://127.0.0.1:8000)
+make run
+
+# Other handy commands
+make install  # Setup Python venv and install frontend npm packages
+make build    # Build frontend production bundle (frontend/dist)
+make test     # Run all pytest suites inside venv
+make clean    # Clean up caches and build artifacts
+```
+
+### One-Click Startup Scripts
 - **Windows:** Double-click or run `run.bat`
 - **macOS / Linux:** Run `./run.sh`
 
@@ -17,6 +35,7 @@ The startup script will automatically:
 4. Launch the local FastAPI server at `http://127.0.0.1:8000` and automatically open your default browser.
 
 ---
+
 
 ## 2. Web Application Workflow
 
