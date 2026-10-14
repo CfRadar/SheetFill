@@ -49,7 +49,7 @@ export const App: React.FC = () => {
             </div>
             <div>
               <h1 className="text-sm font-bold tracking-tight">Flipkart T-Shirt Listing Automation</h1>
-              <p className="text-[11px] text-slate-400">Zero-corruption surgical .xlsm workbook generator</p>
+              <p className="text-[11px] text-slate-400">Zero-corruption surgical .xls workbook generator</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

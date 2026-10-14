@@ -28,12 +28,13 @@ class SessionState(BaseModel):
     design_product_links: Dict[str, Optional[str]] = Field(default_factory=dict)
     design_meta: Dict[str, Dict[str, str]] = Field(default_factory=dict)  # did -> {"brand": ..., "manufacturer": ..., "hsn": ...}
     global_meta: Dict[str, str] = Field(default_factory=dict)  # {"brand": ..., "manufacturer": ..., "hsn": ...}
+    user_id: Optional[str] = None
     output_filename: Optional[str] = None
     report: Optional[Dict[str, Any]] = None
 
 
 class DesignStore:
-    """Manages session folders on disk in app/workspace/sessions/<uuid>/."""
+    """Manages session folders on disk in app/workspace/sessions/<uuid>/ scoped by user."""
 
     def __init__(self, workspace_dir: Optional[str] = None):
         if not workspace_dir:
@@ -50,8 +51,9 @@ class DesignStore:
         filename: str,
         file_bytes: bytes,
         detection_result: DetectionResult,
+        user_id: Optional[str] = None,
     ) -> SessionState:
-        """Initializes a new session folder and saves the uploaded file."""
+        """Initializes a new session folder and saves the uploaded file scoped to user_id."""
         sid = str(uuid.uuid4())
         sdir = self._session_dir(sid)
         sdir.mkdir(parents=True, exist_ok=True)
@@ -65,6 +67,7 @@ class DesignStore:
         now = time.time()
         state = SessionState(
             session_id=sid,
+            user_id=user_id,
             original_filename=filename,
             created_at=now,
             updated_at=now,
@@ -74,15 +77,19 @@ class DesignStore:
         self.save_session(state)
         return state
 
-    def get_session(self, session_id: str) -> Optional[SessionState]:
-        """Loads session state from disk."""
+    def get_session(self, session_id: str, user_id: Optional[str] = None) -> Optional[SessionState]:
+        """Loads session state from disk. If user_id is provided, verifies ownership."""
         sdir = self._session_dir(session_id)
         state_file = sdir / "state.json"
         if not state_file.exists():
             return None
         with open(state_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return SessionState.model_validate(data)
+        state = SessionState.model_validate(data)
+        if user_id is not None and state.user_id is not None:
+            if str(state.user_id) != str(user_id):
+                return None
+        return state
 
     def save_session(self, state: SessionState) -> None:
         """Persists session state to disk."""
@@ -104,9 +111,9 @@ class DesignStore:
         state.summary.partial = partial
         state.summary.complete = complete
 
-    def add_slots(self, session_id: str, count: int) -> Optional[SessionState]:
+    def add_slots(self, session_id: str, count: int, user_id: Optional[str] = None) -> Optional[SessionState]:
         """Appends manual stub designs to the session."""
-        state = self.get_session(session_id)
+        state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
 
@@ -142,9 +149,9 @@ class DesignStore:
         self.save_session(state)
         return state
 
-    def delete_design(self, session_id: str, design_id: str, force: bool = False) -> bool:
+    def delete_design(self, session_id: str, design_id: str, force: bool = False, user_id: Optional[str] = None) -> bool:
         """Deletes a design from the session."""
-        state = self.get_session(session_id)
+        state = self.get_session(session_id, user_id=user_id)
         if not state:
             return False
 
@@ -181,9 +188,10 @@ class DesignStore:
         status: str,
         warnings: List[str],
         errors: List[str],
+        user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
         """Saves JSON for a design and updates its status."""
-        state = self.get_session(session_id)
+        state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
 
@@ -213,9 +221,10 @@ class DesignStore:
         design_id: str,
         image_urls: List[Optional[str]],
         product_link: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
         """Updates the 7 image URLs and product link for a design."""
-        state = self.get_session(session_id)
+        state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
 
@@ -245,9 +254,10 @@ class DesignStore:
         session_id: str,
         design_id: str,
         sizes: List[str],
+        user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
         """Updates the sizes for a design."""
-        state = self.get_session(session_id)
+        state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
 
@@ -267,9 +277,10 @@ class DesignStore:
         brand: Optional[str] = None,
         manufacturer: Optional[str] = None,
         hsn: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
         """Updates brand, manufacturer, and HSN for a specific design."""
-        state = self.get_session(session_id)
+        state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
 
@@ -291,9 +302,10 @@ class DesignStore:
         brand: Optional[str] = None,
         manufacturer: Optional[str] = None,
         hsn: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
         """Applies brand, manufacturer, and HSN to all designs and updates global_meta."""
-        state = self.get_session(session_id)
+        state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
 

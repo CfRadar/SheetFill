@@ -4,10 +4,11 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from typing import Any, Dict, List, Optional, Set
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
+from app.activity import log_event
 from app.api.schemas import (
     AddSlotsRequest,
     AnalyzeResponse,
@@ -25,6 +26,7 @@ from app.api.schemas import (
     SessionResponse,
     BrandMetaRequest,
 )
+from app.auth import CurrentUser, require_user
 from app.services.builder import build_design_rows, get_default_mapper
 from app.services.bulk_matcher import match_bulk_json, parse_batch_json
 from app.services.design_detector import detect_designs
@@ -35,7 +37,7 @@ from flipkart_filler.allowed_values import load_allowed_values
 from flipkart_filler.json_loader import JSONLoadError, parse_single_json_content, sanitize_json_text
 from flipkart_filler.models import ValidationIssue
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
 store = DesignStore()
 
 
@@ -51,13 +53,8 @@ def _json_error(status_code: int, code: str, message: str, details: Any = None) 
     )
 
 
-@router.get("/health")
-def health_check() -> Dict[str, str]:
-    return {"status": "ok"}
-
-
 @router.get("/allowed-values/{attribute}")
-def get_allowed_values(attribute: str) -> Dict[str, Any]:
+def get_allowed_values(attribute: str, user: CurrentUser = Depends(require_user)) -> Dict[str, Any]:
     master_path = _get_master_template_path()
     allowed_map = load_allowed_values(master_path)
     attr_lower = attribute.lower().strip()
@@ -66,7 +63,11 @@ def get_allowed_values(attribute: str) -> Dict[str, Any]:
 
 
 @router.post("/sheets/analyze")
-async def analyze_sheet(file: UploadFile = File(...)) -> Any:
+async def analyze_sheet(
+    request: Request,
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(require_user),
+) -> Any:
     # 25 MB max limit
     MAX_BYTES = 25 * 1024 * 1024
     contents = await file.read()
@@ -77,6 +78,12 @@ async def analyze_sheet(file: UploadFile = File(...)) -> Any:
     ext = Path(filename).suffix.lower()
     if ext not in [".xls", ".xlsm", ".xlsx"]:
         return _json_error(400, "INVALID_FORMAT", f"Unsupported format '{ext}'. Must be .xls, .xlsm, or .xlsx")
+
+    # Validate Excel magic bytes
+    if ext in [".xlsx", ".xlsm"] and not contents.startswith(b"PK\x03\x04"):
+        return _json_error(400, "INVALID_FORMAT", f"File '{filename}' is not a valid Excel OpenXML archive.")
+    if ext == ".xls" and not (contents.startswith(b"\xd0\xcf\x11\xe0") or contents.startswith(b"PK\x03\x04")):
+        return _json_error(400, "INVALID_FORMAT", f"File '{filename}' is not a valid Excel file.")
 
     # Save to temp location to parse
     temp_dir = Path(__file__).resolve().parent.parent / "workspace" / "temp"
@@ -94,7 +101,15 @@ async def analyze_sheet(file: UploadFile = File(...)) -> Any:
             return _json_error(400, "UNREADABLE_FILE", f"Could not read workbook: {str(e)}")
 
         detection_res = detect_designs(raw_sheet)
-        session = store.create_session(filename, contents, detection_res)
+        session = store.create_session(filename, contents, detection_res, user_id=user.id)
+
+        await log_event(
+            event_type="upload_sheet",
+            user=user,
+            request=request,
+            session_id=session.session_id,
+            meta={"filename": filename, "designs_count": len(session.designs)},
+        )
 
         return AnalyzeResponse(
             session_id=session.session_id,
@@ -108,8 +123,8 @@ async def analyze_sheet(file: UploadFile = File(...)) -> Any:
 
 
 @router.get("/sheets/{sid}")
-def get_session_state(sid: str) -> Any:
-    session = store.get_session(sid)
+def get_session_state(sid: str, user: CurrentUser = Depends(require_user)) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -136,34 +151,38 @@ def get_session_state(sid: str) -> Any:
 
 
 @router.post("/sheets/{sid}/add-slots")
-def add_slots(sid: str, req: AddSlotsRequest) -> Any:
-    session = store.get_session(sid)
+def add_slots(sid: str, req: AddSlotsRequest, user: CurrentUser = Depends(require_user)) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
-    updated = store.add_slots(sid, req.count)
+    updated = store.add_slots(sid, req.count, user_id=user.id)
+    if not updated:
+        return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
     return {"status": "ok", "summary": updated.summary, "designs": updated.designs}
 
 
 @router.delete("/sheets/{sid}/designs/{did}")
-def delete_design(sid: str, did: str, force: bool = Query(False)) -> Any:
-    session = store.get_session(sid)
+def delete_design(sid: str, did: str, force: bool = Query(False), user: CurrentUser = Depends(require_user)) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
     try:
-        ok = store.delete_design(sid, did, force=force)
+        ok = store.delete_design(sid, did, force=force, user_id=user.id)
         if not ok:
             return _json_error(404, "DESIGN_NOT_FOUND", f"Design '{did}' not found in session")
-        updated = store.get_session(sid)
+        updated = store.get_session(sid, user_id=user.id)
+        if not updated:
+            return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
         return {"status": "ok", "summary": updated.summary, "designs": updated.designs}
     except ValueError as ve:
         return _json_error(400, "DELETE_FORBIDDEN", str(ve))
 
 
 @router.put("/sheets/{sid}/designs/{did}/json")
-def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
-    session = store.get_session(sid)
+def put_design_json(sid: str, did: str, req: PutJsonRequest, user: CurrentUser = Depends(require_user)) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -182,6 +201,7 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
             status="needs_json",
             warnings=[],
             errors=[],
+            user_id=user.id,
         )
         return PutJsonResponse(
             status="needs_json",
@@ -208,6 +228,7 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
             status="invalid",
             warnings=[],
             errors=[str(jle)],
+            user_id=user.id,
         )
         return PutJsonResponse(
             status="invalid",
@@ -226,6 +247,7 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
             status="invalid",
             warnings=[],
             errors=[str(e)],
+            user_id=user.id,
         )
         return PutJsonResponse(
             status="invalid",
@@ -243,7 +265,6 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
     existing_skus = set()
     for d in session.designs:
         if d.id != did and d.id in session.design_jsons:
-            # We don't clash with ourselves
             pass
 
     custom_sizes = session.design_sizes.get(did)
@@ -272,6 +293,7 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest) -> Any:
         status=b_res.status,
         warnings=[w.message for w in b_res.warnings],
         errors=[e.message for e in b_res.errors],
+        user_id=user.id,
     )
 
     preview_rows = [
@@ -299,8 +321,9 @@ def put_design_images(
     did: str,
     req: PutImagesRequest,
     unlock: Optional[bool] = Query(None),
+    user: CurrentUser = Depends(require_user),
 ) -> Any:
-    session = store.get_session(sid)
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -321,13 +344,20 @@ def put_design_images(
         if url and not url.startswith("https://"):
             return _json_error(400, "INVALID_URL", f"Image URL '{url}' must start with 'https://'")
 
-    updated = store.save_design_images(sid, did, req.urls, req.product_link)
+    updated = store.save_design_images(sid, did, req.urls, req.product_link, user_id=user.id)
+    if not updated:
+        return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
     return {"status": "ok", "design": next((d for d in updated.designs if d.id == did), None)}
 
 
 @router.put("/sheets/{sid}/designs/{did}/sizes")
-def put_design_sizes(sid: str, did: str, req: PutSizesRequest) -> Any:
-    session = store.get_session(sid)
+def put_design_sizes(
+    sid: str,
+    did: str,
+    req: PutSizesRequest,
+    user: CurrentUser = Depends(require_user),
+) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -337,13 +367,20 @@ def put_design_sizes(sid: str, did: str, req: PutSizesRequest) -> Any:
         if not any(s.strip().lower() == a.lower() for a in allowed_sizes):
             return _json_error(400, "INVALID_SIZE", f"Size '{s}' is not an allowed Brand Size")
 
-    updated = store.save_design_sizes(sid, did, req.sizes)
+    updated = store.save_design_sizes(sid, did, req.sizes, user_id=user.id)
+    if not updated:
+        return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
     return {"status": "ok", "design": next((d for d in updated.designs if d.id == did), None)}
 
 
 @router.put("/sheets/{sid}/designs/{did}/meta")
-def put_design_meta(sid: str, did: str, req: BrandMetaRequest) -> Any:
-    session = store.get_session(sid)
+def put_design_meta(
+    sid: str,
+    did: str,
+    req: BrandMetaRequest,
+    user: CurrentUser = Depends(require_user),
+) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -357,7 +394,10 @@ def put_design_meta(sid: str, did: str, req: BrandMetaRequest) -> Any:
         brand=req.brand,
         manufacturer=req.manufacturer,
         hsn=req.hsn,
+        user_id=user.id,
     )
+    if not updated:
+        return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
     # Re-evaluate design status if json exists
     preview_rows = []
@@ -383,12 +423,13 @@ def put_design_meta(sid: str, did: str, req: BrandMetaRequest) -> Any:
             status=b_res.status,
             warnings=[w.message for w in b_res.warnings],
             errors=[e.message for e in b_res.errors],
+            user_id=user.id,
         )
         preview_rows = [
             PreviewRow(sheet_row_index=r.row_index, size=r.size, cells=r.cells)
             for r in b_res.rows
         ]
-        updated = store.get_session(sid)
+        updated = store.get_session(sid, user_id=user.id)
 
     return {
         "status": "ok",
@@ -399,8 +440,12 @@ def put_design_meta(sid: str, did: str, req: BrandMetaRequest) -> Any:
 
 
 @router.post("/sheets/{sid}/meta/apply-all")
-def apply_meta_all(sid: str, req: BrandMetaRequest) -> Any:
-    session = store.get_session(sid)
+def apply_meta_all(
+    sid: str,
+    req: BrandMetaRequest,
+    user: CurrentUser = Depends(require_user),
+) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -409,7 +454,10 @@ def apply_meta_all(sid: str, req: BrandMetaRequest) -> Any:
         brand=req.brand,
         manufacturer=req.manufacturer,
         hsn=req.hsn,
+        user_id=user.id,
     )
+    if not updated:
+        return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
     # Re-evaluate all designs that have JSON
     mapper = get_default_mapper(_get_master_template_path())
@@ -435,9 +483,10 @@ def apply_meta_all(sid: str, req: BrandMetaRequest) -> Any:
                 status=b_res.status,
                 warnings=[w.message for w in b_res.warnings],
                 errors=[e.message for e in b_res.errors],
+                user_id=user.id,
             )
 
-    refreshed = store.get_session(sid)
+    refreshed = store.get_session(sid, user_id=user.id)
     return {
         "status": "ok",
         "global_meta": refreshed.global_meta,
@@ -448,8 +497,12 @@ def apply_meta_all(sid: str, req: BrandMetaRequest) -> Any:
 
 
 @router.post("/sheets/{sid}/bulk-assign")
-def bulk_assign(sid: str, req: BulkAssignRequest) -> Any:
-    session = store.get_session(sid)
+def bulk_assign(
+    sid: str,
+    req: BulkAssignRequest,
+    user: CurrentUser = Depends(require_user),
+) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -476,8 +529,12 @@ def bulk_assign(sid: str, req: BulkAssignRequest) -> Any:
 
 
 @router.post("/sheets/{sid}/bulk-assign/confirm")
-def bulk_confirm(sid: str, req: BulkConfirmRequest) -> Any:
-    session = store.get_session(sid)
+def bulk_confirm(
+    sid: str,
+    req: BulkConfirmRequest,
+    user: CurrentUser = Depends(require_user),
+) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -515,16 +572,17 @@ def bulk_confirm(sid: str, req: BulkConfirmRequest) -> Any:
             status=b_res.status,
             warnings=[w.message for w in b_res.warnings],
             errors=[e.message for e in b_res.errors],
+            user_id=user.id,
         )
         applied.append({"design_id": did, "status": b_res.status})
 
-    updated = store.get_session(sid)
+    updated = store.get_session(sid, user_id=user.id)
     return {"status": "ok", "applied": applied, "errors": errors, "summary": updated.summary}
 
 
 @router.get("/sheets/{sid}/designs/{did}/json-template")
-def get_json_template(sid: str, did: str) -> Any:
-    session = store.get_session(sid)
+def get_json_template(sid: str, did: str, user: CurrentUser = Depends(require_user)) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -557,8 +615,13 @@ def get_json_template(sid: str, did: str) -> Any:
 
 
 @router.post("/sheets/{sid}/generate")
-def generate_workbook(sid: str, req: GenerateRequest) -> Any:
-    session = store.get_session(sid)
+async def generate_workbook(
+    sid: str,
+    req: GenerateRequest,
+    request: Request,
+    user: CurrentUser = Depends(require_user),
+) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
@@ -627,13 +690,26 @@ def generate_workbook(sid: str, req: GenerateRequest) -> Any:
     session.report = report
     store.save_session(session)
 
+    rows_count = report.get("total_rows", 0) if isinstance(report, dict) else 0
+    await log_event(
+        event_type="generate_rows",
+        user=user,
+        request=request,
+        session_id=sid,
+        meta={"mode": req.mode, "output_filename": out_filename, "rows_count": rows_count},
+    )
+
     download_url = f"/api/sheets/{sid}/download"
     return GenerateResponse(download_url=download_url, report=report, filename=out_filename)
 
 
 @router.get("/sheets/{sid}/download")
-def download_workbook(sid: str) -> Any:
-    session = store.get_session(sid)
+async def download_workbook(
+    sid: str,
+    request: Request,
+    user: CurrentUser = Depends(require_user),
+) -> Any:
+    session = store.get_session(sid, user_id=user.id)
     if not session or not session.output_filename:
         return _json_error(404, "FILE_NOT_FOUND", "Generated workbook not found for this session.")
 
@@ -641,6 +717,14 @@ def download_workbook(sid: str) -> Any:
     fpath = sdir / session.output_filename
     if not fpath.exists():
         return _json_error(404, "FILE_NOT_FOUND", f"File '{session.output_filename}' not found on disk.")
+
+    await log_event(
+        event_type="download_workbook",
+        user=user,
+        request=request,
+        session_id=sid,
+        meta={"filename": session.output_filename},
+    )
 
     return FileResponse(
         path=str(fpath),

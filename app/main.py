@@ -1,20 +1,116 @@
-"""FastAPI main application entrypoint."""
+"""FastAPI main application entrypoint with lifespan, CORS, security headers, and health probe."""
 
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+import logging
 from pathlib import Path
-from fastapi import FastAPI
+from typing import Any, AsyncGenerator, Dict
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.admin import router as admin_router
 from app.api.sheets import router as sheets_router
+from app.auth import router as auth_router
+from app.config import settings
+from app.db import close_db, connect_and_init_db, is_db_connected
+
+logger = logging.getLogger("sheetfill.main")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manages application startup and shutdown lifecycle."""
+    # Validate production configuration if configured
+    settings.validate_production()
+
+    # Attempt to connect to MongoDB and build indexes
+    await connect_and_init_db(max_retries=5, initial_delay=1.0)
+    yield
+    await close_db()
+
+
+# Configure docs visibility based on environment
+docs_url = None if settings.env == "production" else "/docs"
+redoc_url = None if settings.env == "production" else "/redoc"
+openapi_url = None if settings.env == "production" else "/openapi.json"
 
 app = FastAPI(
     title="Flipkart T-Shirt Listing Automation",
-    description="Automates Flipkart T-shirt workbook listing generation without macro corruption.",
+    description="Automates Flipkart T-shirt workbook listing generation with subscription access control.",
     version="1.0.0",
+    docs_url=docs_url,
+    redoc_url=redoc_url,
+    openapi_url=openapi_url,
+    lifespan=lifespan,
 )
 
-# Include API router
+# CORS middleware
+origins = [settings.frontend_origin]
+if settings.env == "development":
+    origins.extend(["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"])
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+)
+
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    # Enforce no-cache on sensitive API endpoints
+    path = request.url.path
+    if path.startswith("/api/auth") or path.startswith("/api/admin") or "/download" in path:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+        response.headers["Pragma"] = "no-cache"
+
+    return response
+
+
+# Global exception handler for uniform error JSON formatting
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled server error on {request.method} {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "INTERNAL_SERVER_ERROR",
+                "message": "An unexpected server error occurred. Please try again later.",
+                "details": None,
+            }
+        },
+    )
+
+
+# --------------------------------------------------------------------------
+# Public Health Probe: /api/health
+# --------------------------------------------------------------------------
+@app.get("/api/health")
+async def health_check() -> Dict[str, Any]:
+    """Public probe reporting container and database status for Render wake-up."""
+    return {
+        "status": "ok",
+        "db": is_db_connected(),
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "env": settings.env,
+    }
+
+
+# Include Routers
+app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(sheets_router)
 
 # Mount frontend build if it exists
@@ -30,8 +126,7 @@ else:
                 <head><title>Flipkart T-Shirt Filler</title></head>
                 <body style="font-family: sans-serif; padding: 40px; text-align: center;">
                     <h2>Flipkart T-Shirt Listing Automation API</h2>
-                    <p>The backend is running. Frontend static build will be served here once built.</p>
-                    <p><a href="/docs">View Interactive API Documentation (/docs)</a></p>
+                    <p>The backend is running with subscription access control.</p>
                 </body>
             </html>
             """
