@@ -193,3 +193,87 @@ def test_get_me_endpoint_with_auth():
     finally:
         app.dependency_overrides.update(saved_overrides)
 
+
+def test_unified_login_admin_success():
+    """Admin login through /api/auth/login returns role 'admin' and 2-hour JWT."""
+    with TestClient(app) as client:
+        # Note: True@190_$ is the admin password configured in .env
+        resp = client.post(
+            "/api/auth/login",
+            json={"username": settings.admin_username.lower(), "password": "True@190_$"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["role"] == "admin"
+        assert data["username"] == settings.admin_username
+        assert "token" in data
+        assert "expires_at" in data
+
+
+def test_unified_login_admin_wrong_password():
+    """Wrong admin password through /api/auth/login gives generic INVALID_CREDENTIALS."""
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/auth/login",
+            json={"username": settings.admin_username.lower(), "password": "IncorrectPassword123!"},
+        )
+        assert resp.status_code == 401
+        data = resp.json()
+        assert data["detail"]["code"] == "INVALID_CREDENTIALS"
+
+
+def test_admin_token_on_user_route_returns_401():
+    """Admin token on a user route (e.g. /api/sheets/{sid}) returns 401 USER_ROLE_REQUIRED."""
+    with TestClient(app) as client:
+        saved_overrides = dict(app.dependency_overrides)
+        app.dependency_overrides.clear()
+        try:
+            now = datetime.now(timezone.utc)
+            admin_token = create_access_token(
+                user_id="admin_user_id_123",
+                session_id="admin_session_123",
+                role="admin",
+                expires_at=now + timedelta(hours=2),
+            )
+            set_cached_session(
+                "admin_session_123",
+                {
+                    "user_id": "admin_user_id_123",
+                    "username": settings.admin_username,
+                    "role": "admin",
+                    "revoked": False,
+                    "expires_at": now + timedelta(hours=2),
+                    "user_active": True,
+                },
+            )
+            resp = client.get(
+                "/api/sheets/nonexistent-sid",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            assert resp.status_code == 401
+            data = resp.json()
+            assert data["detail"]["code"] == "USER_ROLE_REQUIRED"
+        finally:
+            app.dependency_overrides.update(saved_overrides)
+
+
+def test_creating_subscriber_with_admin_username_rejected():
+    """POST /api/admin/users must reject creating a subscriber with ADMIN_USERNAME."""
+    from app.auth import CurrentUser, require_admin
+    with TestClient(app) as client:
+        app.dependency_overrides[require_admin] = lambda: CurrentUser(
+            id="admin_id",
+            username=settings.admin_username,
+            display_name="Admin",
+            role="admin",
+            session_id="admin_sess",
+        )
+
+        resp = client.post(
+            "/api/admin/users",
+            json={"username": settings.admin_username, "password": "SamplePassword123!"},
+        )
+        assert resp.status_code == 409
+        data = resp.json()
+        assert data["detail"]["code"] == "RESERVED_USERNAME"
+

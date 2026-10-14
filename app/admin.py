@@ -98,7 +98,7 @@ class AdminStatsResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------
-# Admin Login
+# Admin Login (DEPRECATED: in favor of unified POST /api/auth/login)
 # --------------------------------------------------------------------------
 @router.post("/login", response_model=AdminLoginResponse)
 async def admin_login(req: AdminLoginRequest, request: Request, response: Response) -> AdminLoginResponse:
@@ -308,6 +308,13 @@ async def create_user(
     admin: CurrentUser = Depends(require_admin),
 ) -> UserItemResponse:
     clean_username = req.username.strip().lower()
+    if constant_time_compare(clean_username, settings.admin_username.strip().lower()):
+        raise _auth_error(
+            status.HTTP_409_CONFLICT,
+            "RESERVED_USERNAME",
+            "This username is reserved and cannot be used for subscriber accounts.",
+        )
+
     if not USERNAME_REGEX.match(clean_username):
         raise _auth_error(
             status.HTTP_400_BAD_REQUEST,

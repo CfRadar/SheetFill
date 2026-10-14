@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export type WakeStatus = "checking" | "waking" | "ready" | "failed";
 
@@ -15,7 +15,7 @@ export function useServerWake(): ServerWakeState {
   const checkHealth = async (): Promise<boolean> => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
       const res = await fetch("/api/health", {
         signal: controller.signal,
         cache: "no-store",
@@ -33,12 +33,12 @@ export function useServerWake(): ServerWakeState {
     }
   };
 
-  useEffect(() => {
+  const startWakeCycle = useCallback(() => {
     let timer: any = null;
     let pollTimer: any = null;
     let isMounted = true;
 
-    const startWakeCycle = async () => {
+    const run = async () => {
       const isReadyInitially = await checkHealth();
       if (!isMounted) return;
 
@@ -47,7 +47,6 @@ export function useServerWake(): ServerWakeState {
         return;
       }
 
-      // If initial check fails, mark as waking and start timer
       setStatus("waking");
       const startTime = Date.now();
 
@@ -55,8 +54,10 @@ export function useServerWake(): ServerWakeState {
         if (!isMounted) return;
         const seconds = Math.floor((Date.now() - startTime) / 1000);
         setElapsedSeconds(seconds);
-        if (seconds > 100) {
+        if (seconds >= 120) {
           setStatus("failed");
+          clearInterval(timer);
+          clearTimeout(pollTimer);
         }
       }, 1000);
 
@@ -68,16 +69,16 @@ export function useServerWake(): ServerWakeState {
         if (ready) {
           setStatus("ready");
           clearInterval(timer);
-          clearInterval(pollTimer);
+          clearTimeout(pollTimer);
         } else {
-          pollTimer = setTimeout(poll, 3000);
+          pollTimer = setTimeout(poll, 2500);
         }
       };
 
-      pollTimer = setTimeout(poll, 2500);
+      pollTimer = setTimeout(poll, 2000);
     };
 
-    startWakeCycle();
+    run();
 
     return () => {
       isMounted = false;
@@ -86,11 +87,16 @@ export function useServerWake(): ServerWakeState {
     };
   }, []);
 
-  const retry = () => {
+  useEffect(() => {
+    const cleanup = startWakeCycle();
+    return cleanup;
+  }, [startWakeCycle]);
+
+  const retry = useCallback(() => {
     setStatus("checking");
     setElapsedSeconds(0);
-    window.location.reload();
-  };
+    startWakeCycle();
+  }, [startWakeCycle]);
 
   return { status, elapsedSeconds, retry };
 }

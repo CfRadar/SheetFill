@@ -9,6 +9,8 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
+from pymongo import ReturnDocument
+
 from app.activity import log_event
 from app.cache import (
     get_cached_session,
@@ -19,15 +21,20 @@ from app.cache import (
 from app.config import settings
 from app.db import get_db, is_db_connected
 from app.security import (
+    constant_time_compare,
     create_access_token,
     decode_access_token,
     get_client_ip,
     get_client_user_agent,
+    hash_password,
     verify_password,
 )
 
 logger = logging.getLogger("sheetfill.auth")
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# Pre-computed dummy Argon2id hash for constant-time verification when user does not exist
+_DUMMY_HASH = hash_password("dummy_password_timing_defense")
 
 
 class CurrentUser(BaseModel):
@@ -157,7 +164,7 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
     clean_username = req.username.strip().lower()
     rate_key = f"{ip}:{clean_username}"
 
-    # 1. Rate limit check
+    # 1. Rate limit check (shared for both admin and subscriber)
     await _check_rate_limit(rate_key)
 
     if not is_db_connected():
@@ -168,10 +175,129 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
         )
 
     db = get_db()
-    user = await db.users.find_one({"username": clean_username})
+    now = datetime.now(timezone.utc)
 
-    # 2. Verify password (generic error on missing user or invalid password)
-    if not user or not verify_password(req.password, user.get("password_hash", "")):
+    # 2. Check if username matches admin credentials (constant-time comparison)
+    is_admin = constant_time_compare(clean_username, settings.admin_username.strip().lower())
+    if is_admin:
+        pwd_match = verify_password(req.password, settings.admin_password_hash)
+        if not pwd_match:
+            await _record_login_failure(rate_key, ip, clean_username)
+            log_event("admin_login_failed", username=clean_username, ip=ip, user_agent=ua)
+            raise _auth_error(
+                status.HTTP_401_UNAUTHORIZED,
+                "INVALID_CREDENTIALS",
+                "Invalid username or password.",
+            )
+
+        # Clear rate limit failures on success
+        await _clear_login_failures(rate_key)
+
+        admin_doc = await db.users.find_one_and_update(
+            {"username": settings.admin_username, "role": "admin"},
+            {
+                "$setOnInsert": {
+                    "created_at": now,
+                },
+                "$set": {
+                    "password_hash": settings.admin_password_hash,
+                    "role": "admin",
+                    "is_active": True,
+                    "display_name": "Administrator",
+                    "access_expires_at": None,
+                    "updated_at": now,
+                    "last_login_at": now,
+                },
+            },
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+
+        uid = str(admin_doc["_id"])
+        sid = str(uuid.uuid4())
+        session_exp = now + timedelta(hours=2)
+
+        session_doc = {
+            "session_id": sid,
+            "user_id": ObjectId(uid),
+            "device_id": req.device_id or str(uuid.uuid4()),
+            "user_agent": ua,
+            "ip": ip,
+            "created_at": now,
+            "last_seen_at": now,
+            "expires_at": session_exp,
+            "revoked": False,
+            "revoked_reason": None,
+        }
+        await db.sessions.insert_one(session_doc)
+
+        token = create_access_token(
+            user_id=uid,
+            session_id=sid,
+            role="admin",
+            expires_at=session_exp,
+        )
+
+        set_cached_session(
+            sid,
+            {
+                "user_id": uid,
+                "username": settings.admin_username,
+                "display_name": "Administrator",
+                "role": "admin",
+                "revoked": False,
+                "revoked_reason": None,
+                "expires_at": session_exp,
+                "user_active": True,
+                "access_expires_at": None,
+                "last_seen_update": now,
+            },
+        )
+
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            httponly=True,
+            samesite="lax",
+            secure=settings.env == "production",
+            max_age=7200,
+            path="/",
+        )
+
+        log_event(
+            "login_success",
+            user_id=uid,
+            username=settings.admin_username,
+            ip=ip,
+            user_agent=ua,
+            session_id=sid,
+            meta={"role": "admin"},
+        )
+
+        return LoginResponse(
+            token=token,
+            expires_at=session_exp.isoformat(),
+            access_expires_at=None,
+            days_left=None,
+            username=settings.admin_username,
+            display_name="Administrator",
+            role="admin",
+        )
+
+    # 3. Subscriber flow
+    user = await db.users.find_one({"username": clean_username, "role": "user"})
+    if not user:
+        # Constant-time dummy verify to avoid revealing whether username exists
+        verify_password(req.password, _DUMMY_HASH)
+        await _record_login_failure(rate_key, ip, clean_username)
+        log_event("login_failed", username=clean_username, ip=ip, user_agent=ua)
+        raise _auth_error(
+            status.HTTP_401_UNAUTHORIZED,
+            "INVALID_CREDENTIALS",
+            "Invalid username or password.",
+        )
+
+    if not verify_password(req.password, user.get("password_hash", "")):
         await _record_login_failure(rate_key, ip, clean_username)
         log_event("login_failed", username=clean_username, ip=ip, user_agent=ua)
         raise _auth_error(
@@ -183,7 +309,7 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
     # Reset rate limit counter on valid credentials
     await _clear_login_failures(rate_key)
 
-    # 3. Check account status & subscription expiry
+    # 4. Check account status & subscription expiry
     if not user.get("is_active", True):
         log_event("access_denied_disabled", str(user["_id"]), clean_username, ip, ua)
         raise _auth_error(
@@ -192,7 +318,6 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
             "Your account has been deactivated. Please contact administrator.",
         )
 
-    now = datetime.now(timezone.utc)
     access_exp: Optional[datetime] = user.get("access_expires_at")
     if access_exp:
         if access_exp.tzinfo is None:
@@ -208,9 +333,8 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
 
     uid = str(user["_id"])
 
-    # 4. Single-Device Policy enforcement
+    # 5. Single-Device Policy enforcement
     if settings.session_policy == "block":
-        # Check if an existing session was active in the last 10 minutes
         existing = await db.sessions.find_one(
             {"user_id": ObjectId(uid), "revoked": False, "expires_at": {"$gt": now}}
         )
@@ -225,14 +349,12 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
                     "This account is currently active on another device. Please log out there first.",
                 )
             else:
-                # Idle session: revoke
                 await db.sessions.update_one(
                     {"_id": existing["_id"]},
                     {"$set": {"revoked": True, "revoked_reason": "replaced"}},
                 )
                 invalidate_session(existing["session_id"])
     else:
-        # Default policy: "replace" -> revoke all existing active sessions of this user
         cursor = db.sessions.find({"user_id": ObjectId(uid), "revoked": False})
         async for s_doc in cursor:
             invalidate_session(s_doc["session_id"])
@@ -250,8 +372,6 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
         )
         invalidate_user_sessions(uid)
 
-    # 5. Compute token expiration
-    # token_expiry = min(ACCESS_TOKEN_MINUTES, time left until access_expires_at)
     max_token_exp = now + timedelta(minutes=settings.access_token_minutes)
     if access_exp and access_exp < max_token_exp:
         session_exp = access_exp
@@ -261,7 +381,6 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
     sid = str(uuid.uuid4())
     device_id = req.device_id or str(uuid.uuid4())
 
-    # 6. Insert new session document
     session_doc = {
         "session_id": sid,
         "user_id": ObjectId(uid),
@@ -275,18 +394,15 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
         "revoked_reason": None,
     }
     await db.sessions.insert_one(session_doc)
-
-    # Update user last_login_at
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"last_login_at": now}})
 
-    # Cache the fresh session
     set_cached_session(
         sid,
         {
             "user_id": uid,
             "username": clean_username,
             "display_name": user.get("display_name", clean_username),
-            "role": user.get("role", "user"),
+            "role": "user",
             "revoked": False,
             "revoked_reason": None,
             "expires_at": session_exp,
@@ -296,15 +412,13 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
         },
     )
 
-    # 7. Issue signed JWT
     token = create_access_token(
         user_id=uid,
         session_id=sid,
-        role=user.get("role", "user"),
+        role="user",
         expires_at=session_exp,
     )
 
-    # Set secure cookie
     response.set_cookie(
         key="access_token",
         value=token,
@@ -318,7 +432,15 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
     if access_exp:
         days_left = max(0, (access_exp - now).days)
 
-    log_event("login_success", uid, clean_username, ip, ua, session_id=sid)
+    log_event(
+        "login_success",
+        user_id=uid,
+        username=clean_username,
+        ip=ip,
+        user_agent=ua,
+        session_id=sid,
+        meta={"role": "user"},
+    )
 
     return LoginResponse(
         token=token,
@@ -327,8 +449,9 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
         days_left=days_left,
         username=clean_username,
         display_name=user.get("display_name", clean_username),
-        role=user.get("role", "user"),
+        role="user",
     )
+
 
 
 @router.post("/logout")
@@ -376,11 +499,11 @@ def _extract_token(request: Request, authorization: Optional[str]) -> Optional[s
     return request.cookies.get("access_token")
 
 
-async def require_user(
+async def _get_current_authenticated_user(
     request: Request,
     authorization: Optional[str] = Header(None),
 ) -> CurrentUser:
-    """Shared FastAPI dependency verifying active user, session record, and subscription."""
+    """Shared FastAPI dependency verifying active token and valid session record."""
     token = _extract_token(request, authorization)
     if not token:
         raise _auth_error(
@@ -528,8 +651,21 @@ async def require_user(
     )
 
 
+async def require_user(
+    user: CurrentUser = Depends(_get_current_authenticated_user),
+) -> CurrentUser:
+    """Dependency verifying the caller is authenticated with subscriber role 'user'."""
+    if user.role != "user":
+        raise _auth_error(
+            status.HTTP_401_UNAUTHORIZED,
+            "USER_ROLE_REQUIRED",
+            "This endpoint is only accessible to subscriber user accounts.",
+        )
+    return user
+
+
 async def require_admin(
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(_get_current_authenticated_user),
 ) -> CurrentUser:
     """Dependency verifying the caller is authenticated as an admin."""
     if user.role != "admin":
@@ -542,7 +678,7 @@ async def require_admin(
 
 
 @router.get("/me", response_model=MeResponse)
-async def get_me(user: CurrentUser = Depends(require_user)) -> MeResponse:
+async def get_me(user: CurrentUser = Depends(_get_current_authenticated_user)) -> MeResponse:
     """Returns profile and subscription expiry details for the current user."""
     now = datetime.now(timezone.utc)
     days_left = None

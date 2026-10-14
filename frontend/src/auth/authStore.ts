@@ -21,6 +21,7 @@ interface AuthState {
   setUser: (user: CurrentUser | null) => void;
   setAdminMode: (admin: boolean) => void;
   setErrorNotice: (notice: { code: string; message: string } | null) => void;
+  login: (username: string, password: string) => Promise<void>;
   loginUser: (username: string, password: string) => Promise<void>;
   loginAdmin: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -110,14 +111,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setErrorNotice: (errorNotice) => set({ errorNotice }),
 
-  loginUser: async (username: string, password: string) => {
+  login: async (username: string, password: string) => {
     set({ isLoading: true, errorNotice: null });
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username,
+          username: username.trim(),
           password,
           device_id: get().deviceId,
         }),
@@ -125,59 +126,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const data = await res.json();
       if (!res.ok) {
-        const code = data?.error?.code || "LOGIN_FAILED";
-        const message = data?.error?.message || "Invalid credentials. Please try again.";
+        const code = data?.detail?.code || data?.error?.code || "INVALID_CREDENTIALS";
+        const message = data?.detail?.message || data?.error?.message || "Invalid credentials. Please try again.";
         set({ isLoading: false, errorNotice: { code, message } });
         throw new Error(message);
       }
 
+      const role: "user" | "admin" = data.role === "admin" ? "admin" : "user";
       const user: CurrentUser = {
         id: data.username,
         username: data.username,
-        display_name: data.display_name,
-        role: "user",
+        display_name: data.display_name || (role === "admin" ? "Administrator" : data.username),
+        role,
         access_expires_at: data.access_expires_at,
         days_left: data.days_left,
       };
 
       get().setToken(data.token, user);
-      set({ isLoading: false, errorNotice: null });
+      set({ isLoading: false, errorNotice: null, isAdminMode: role === "admin" });
     } catch (err: any) {
       set({ isLoading: false });
       throw err;
     }
   },
 
+  loginUser: async (username: string, password: string) => {
+    return get().login(username, password);
+  },
+
   loginAdmin: async (username: string, password: string) => {
-    set({ isLoading: true, errorNotice: null });
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        const code = data?.error?.code || "INVALID_CREDENTIALS";
-        const message = data?.error?.message || "Invalid administrator credentials.";
-        set({ isLoading: false, errorNotice: { code, message } });
-        throw new Error(message);
-      }
-
-      const user: CurrentUser = {
-        id: "admin",
-        username: data.username,
-        display_name: "Administrator",
-        role: "admin",
-      };
-
-      get().setToken(data.token, user);
-      set({ isLoading: false, errorNotice: null, isAdminMode: true });
-    } catch (err: any) {
-      set({ isLoading: false });
-      throw err;
-    }
+    return get().login(username, password);
   },
 
   logout: async () => {

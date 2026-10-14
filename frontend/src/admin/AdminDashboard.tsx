@@ -244,14 +244,6 @@ export const AdminDashboard: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setAdminMode(false)}
-            className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-          >
-            <span>Open Sheet Filler App</span>
-            <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
-          </button>
-          <button
-            type="button"
             onClick={logout}
             className="text-xs px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 transition flex items-center gap-1.5 cursor-pointer"
           >
