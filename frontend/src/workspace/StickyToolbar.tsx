@@ -28,7 +28,7 @@ import {
   MoreHorizontal,
   Layers,
 } from "lucide-react";
-import { addSlots, generateWorkbook } from "../api";
+import { addSlots, generateWorkbook, getSession, downloadWorkbookFile } from "../api";
 import { useAppStore } from "../store";
 import { PromptDropdown } from "../components/PromptDropdown";
 import { toast } from "../ui/ToastProvider";
@@ -50,6 +50,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
   const [slotCount, setSlotCount] = useState<number>(1);
   const [isAdding, setIsAdding] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   // New Sheet confirmation modal
@@ -85,14 +86,50 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
     }
   };
 
+  const handleDirectDownload = async () => {
+    const url = session?.download_url;
+    if (!url || isDownloading) return;
+    try {
+      setIsDownloading(true);
+      await downloadWorkbookFile(url, session.output_filename || undefined);
+      toast.success("Workbook downloaded successfully!");
+    } catch (err: any) {
+      console.error("Direct download error:", err);
+      toast.error(err?.message || "Failed to download workbook");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (readyCount === 0 || isGenerating) return;
     try {
       setIsGenerating(true);
       setError(null);
       const res = await generateWorkbook(session.session_id, "ready_only");
+
+      // Sync session in store with refreshed state
+      try {
+        const refreshed = await getSession(session.session_id);
+        setSession(refreshed);
+      } catch {
+        setSession({
+          ...session,
+          download_url: res.download_url,
+          output_filename: res.filename,
+          report: res.report,
+        });
+      }
+
       toast.success("Workbook generated successfully!", "Download ready");
       onGenerated(res.download_url, res.report, res.filename);
+
+      // Trigger automatic file download
+      try {
+        await downloadWorkbookFile(res.download_url, res.filename);
+      } catch (dlErr: any) {
+        console.warn("Auto-download trigger failed (browser may require manual click):", dlErr);
+      }
     } catch (err: any) {
       setError(err?.message || "Generation failed");
     } finally {
@@ -237,31 +274,79 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                     <MoreHorizontal className="w-4 h-4" />
                   </Button>
                 </DropdownTrigger>
-                <DropdownMenu aria-label="Toolbar options" variant="flat">
-                  <DropdownItem
-                    key="paste-json"
-                    startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
-                    onPress={onOpenBulkPaste}
-                  >
-                    Paste all JSON
-                  </DropdownItem>
-                  <DropdownItem
-                    key="add-slots"
-                    startContent={<Plus className="w-4 h-4 text-default-500" />}
-                    onPress={() => setIsPopoverOpen(true)}
-                  >
-                    Add slots
-                  </DropdownItem>
-                  <DropdownItem
-                    key="new-sheet"
-                    startContent={<RotateCcw className="w-4 h-4 text-default-500" />}
-                    onPress={onOpenConfirm}
-                  >
-                    New sheet
-                  </DropdownItem>
-                </DropdownMenu>
+                {session.download_url ? (
+                  <DropdownMenu aria-label="Toolbar options" variant="flat">
+                    <DropdownItem
+                      key="download-xls"
+                      startContent={<Download className="w-4 h-4 text-emerald-500" />}
+                      onPress={handleDirectDownload}
+                    >
+                      Download .xls
+                    </DropdownItem>
+                    <DropdownItem
+                      key="paste-json"
+                      startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
+                      onPress={onOpenBulkPaste}
+                    >
+                      Paste all JSON
+                    </DropdownItem>
+                    <DropdownItem
+                      key="add-slots"
+                      startContent={<Plus className="w-4 h-4 text-default-500" />}
+                      onPress={() => setIsPopoverOpen(true)}
+                    >
+                      Add slots
+                    </DropdownItem>
+                    <DropdownItem
+                      key="new-sheet"
+                      startContent={<RotateCcw className="w-4 h-4 text-default-500" />}
+                      onPress={onOpenConfirm}
+                    >
+                      New sheet
+                    </DropdownItem>
+                  </DropdownMenu>
+                ) : (
+                  <DropdownMenu aria-label="Toolbar options" variant="flat">
+                    <DropdownItem
+                      key="paste-json"
+                      startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
+                      onPress={onOpenBulkPaste}
+                    >
+                      Paste all JSON
+                    </DropdownItem>
+                    <DropdownItem
+                      key="add-slots"
+                      startContent={<Plus className="w-4 h-4 text-default-500" />}
+                      onPress={() => setIsPopoverOpen(true)}
+                    >
+                      Add slots
+                    </DropdownItem>
+                    <DropdownItem
+                      key="new-sheet"
+                      startContent={<RotateCcw className="w-4 h-4 text-default-500" />}
+                      onPress={onOpenConfirm}
+                    >
+                      New sheet
+                    </DropdownItem>
+                  </DropdownMenu>
+                )}
               </Dropdown>
             </div>
+
+            {/* Direct Download Action: Appears whenever workbook is generated */}
+            {session.download_url && (
+              <Button
+                size="sm"
+                color="success"
+                variant="solid"
+                isLoading={isDownloading}
+                startContent={!isDownloading && <Download className="w-3.5 h-3.5" />}
+                onPress={handleDirectDownload}
+                className="h-9 px-3.5 rounded-[10px] font-semibold text-xs text-white bg-emerald-600 hover:bg-emerald-500 shadow-xs"
+              >
+                {isDownloading ? "Downloading..." : "Download .xls"}
+              </Button>
+            )}
 
             {/* Dominant Primary Action: Generate .xls (ALWAYS visible) */}
             {readyCount === 0 ? (
@@ -280,7 +365,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                     color="primary"
                     variant="solid"
                     isDisabled
-                    startContent={<Download className="w-3.5 h-3.5" />}
+                    startContent={<FileSpreadsheet className="w-3.5 h-3.5" />}
                     className="h-9 px-3.5 rounded-[10px] font-semibold text-xs opacity-50 cursor-not-allowed"
                   >
                     Generate .xls
@@ -293,7 +378,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                 color="primary"
                 variant="solid"
                 isLoading={isGenerating}
-                startContent={!isGenerating && <Download className="w-3.5 h-3.5" />}
+                startContent={!isGenerating && <FileSpreadsheet className="w-3.5 h-3.5" />}
                 onPress={handleGenerate}
                 className="h-9 px-4 rounded-[10px] font-semibold text-xs text-white shadow-xs"
               >

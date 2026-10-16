@@ -23,6 +23,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
     report: any;
     filename?: string;
   } | null>(null);
+  const [isReportDismissed, setIsReportDismissed] = useState(false);
 
   // Initialize active design: select first incomplete or first design
   useEffect(() => {
@@ -36,12 +37,19 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
     }
   }, [session, activeDesignId]);
 
-  // If session output is invalidated due to edits, dismiss stale download banner
+  // Sync downloadInfo from session if already generated (e.g. on load/refresh)
   useEffect(() => {
-    if (!session?.download_url && downloadInfo) {
+    if (session?.download_url && session?.report && !downloadInfo && !isReportDismissed) {
+      setDownloadInfo({
+        url: session.download_url,
+        report: session.report,
+        filename: session.output_filename || undefined,
+      });
+    } else if (!session?.download_url && !session?.output_filename && downloadInfo) {
+      // Invalidate download panel when user modifies session data
       setDownloadInfo(null);
     }
-  }, [session?.download_url, downloadInfo]);
+  }, [session?.download_url, session?.report, session?.output_filename, isReportDismissed]);
 
   if (!session) return null;
 
@@ -58,6 +66,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
   };
 
   const handleGenerated = (url: string, report: any, filename?: string) => {
+    setIsReportDismissed(false);
     setDownloadInfo({ url, report, filename });
   };
 
@@ -78,7 +87,10 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
             report={downloadInfo.report}
             downloadUrl={downloadInfo.url}
             filename={downloadInfo.filename}
-            onReset={() => setDownloadInfo(null)}
+            onReset={() => {
+              setIsReportDismissed(true);
+              setDownloadInfo(null);
+            }}
           />
         </div>
       )}
