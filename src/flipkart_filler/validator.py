@@ -4,7 +4,7 @@ zero-corruption of VBA/macros/controls, and strict adherence to Flipkart guideli
 
 from pathlib import Path
 import re
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
 import zipfile
 import openpyxl
 from openpyxl.utils import get_column_letter
@@ -243,6 +243,49 @@ def verify_workbook_content(
                                         message=f"Value '{val_item}' not in allowed list for column {col_letter}.",
                                     )
                                 )
+
+        # 4. Check intra-group matching attribute consistency & variant uniqueness
+        matching_col_letters = ["BE", "AM", "BI", "BK", "BJ", "BG", "AG", "BH", "BC", "AP", "AN", "BF", "AH", "AJ", "AI", "BD", "AO", "AK", "AL"]
+        rows_by_group: Dict[str, List[int]] = {}
+        for r_num in range(start_row, start_row + len(expected_rows)):
+            grp_val = str(o_ws.cell(row=r_num, column=8).value or "").strip()
+            if grp_val:
+                rows_by_group.setdefault(grp_val, []).append(r_num)
+
+        for grp_val, r_list in rows_by_group.items():
+            if len(r_list) > 1:
+                parent_r = r_list[0]
+                # Check matching attributes
+                for m_col in matching_col_letters:
+                    col_idx = openpyxl.utils.column_index_from_string(m_col)
+                    p_val = str(o_ws.cell(row=parent_r, column=col_idx).value or "")
+                    for child_r in r_list[1:]:
+                        c_val = str(o_ws.cell(row=child_r, column=col_idx).value or "")
+                        if p_val != c_val:
+                            issues.append(
+                                ValidationIssue(
+                                    level="ERROR",
+                                    field=f"{m_col}{child_r}",
+                                    message=f"Matching attribute {m_col} inconsistent within group '{grp_val}': row {child_r} ('{c_val}') != parent row {parent_r} ('{p_val}').",
+                                )
+                            )
+                # Check variant uniqueness (Brand Size AR + Brand Color AT)
+                size_idx = openpyxl.utils.column_index_from_string("AR")
+                color_idx = openpyxl.utils.column_index_from_string("AT")
+                seen_variants: Set[Tuple[str, str]] = set()
+                for r_num in r_list:
+                    s_val = str(o_ws.cell(row=r_num, column=size_idx).value or "").strip().lower()
+                    c_val = str(o_ws.cell(row=r_num, column=color_idx).value or "").strip().lower()
+                    combo = (s_val, c_val)
+                    if combo in seen_variants:
+                        issues.append(
+                            ValidationIssue(
+                                level="ERROR",
+                                field=f"AR{r_num}",
+                                message=f"Duplicate variant (Size '{s_val}', Color '{c_val}') within group '{grp_val}' on row {r_num}.",
+                            )
+                        )
+                    seen_variants.add(combo)
 
     t_wb.close()
     o_wb.close()

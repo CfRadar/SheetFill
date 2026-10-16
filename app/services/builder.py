@@ -18,6 +18,29 @@ from flipkart_filler.text_builders import (
 
 IMAGE_COLS = ["AU", "AV", "AW", "AX", "AY", "AZ", "BA"]
 
+# Flipkart official 19 Matching Attributes (must be 100% identical for all rows in a Group ID)
+MATCHING_ATTRIBUTE_COLS = [
+    "BE",  # Print Coverage
+    "AM",  # Occasion
+    "BI",  # Video URL
+    "BK",  # Sleeve Details
+    "BJ",  # Surface Styling
+    "BG",  # Reversible
+    "AG",  # Brand
+    "BH",  # Fabric Care
+    "BC",  # Sport Type
+    "AP",  # Suitable For
+    "AN",  # Pack of
+    "BF",  # Tee Length
+    "AH",  # Type (Neck)
+    "AJ",  # Fabric
+    "AI",  # Pattern
+    "BD",  # Detail Placement
+    "AO",  # Fit
+    "AK",  # Ideal For
+    "AL",  # Sleeve
+]
+
 
 def get_default_mapper(template_path: Optional[str] = None) -> ValueMapper:
     """Creates a configured ValueMapper using default config paths and the master template."""
@@ -393,12 +416,20 @@ def build_design_rows(
     else:
         search_keywords_str = ""
 
-    # Fabric Care
+    # Fabric Care (Col BH) - Matching Attribute: Canonicalize against allowed values
+    allowed_care = mapper.allowed_values.get("fabric care", [])
     care_input = json_data.get("fabric_care") or design.existing_values.get("BH")
     if care_input:
-        fabric_care_str = str(care_input).strip()
+        canonical_map = {v.lower(): v for v in allowed_care}
+        raw_items = [s.strip() for s in str(care_input).split("::") if s.strip()]
+        canonical_items = []
+        for it in raw_items:
+            if it.lower() in canonical_map:
+                canonical_items.append(canonical_map[it.lower()])
+            else:
+                canonical_items.append(it)
+        fabric_care_str = "::".join(canonical_items) if canonical_items else "Regular Machine Wash"
     else:
-        allowed_care = mapper.allowed_values.get("fabric care", [])
         prod_obj = ProductInput(
             product_title=json_data.get("product_title", ""),
             product_description=json_data.get("product_description", ""),
@@ -427,10 +458,18 @@ def build_design_rows(
             )
         )
 
-    # Detail Placement (Col BD) rule:
-    # default ["S"], or "all", or list of sizes
-    dp_val = json_data.get("detail_placement") or design.existing_values.get("BD") or defaults.get("detail_placement", "Front Panel")
-    dp_rows = json_data.get("detail_placement_rows", ["S"])
+    # Detail Placement (Col BD) - Matching Attribute: must be uniform across all sizes in the group
+    raw_dp = json_data.get("detail_placement") or design.existing_values.get("BD") or defaults.get("detail_placement", "Front Panel")
+    if raw_dp:
+        raw_dp = str(raw_dp).strip()
+        allowed_dp = mapper.allowed_values.get("detail placement", [])
+        if allowed_dp:
+            dp_map = {v.lower(): v for v in allowed_dp}
+            dp_val = dp_map.get(raw_dp.lower(), raw_dp)
+        else:
+            dp_val = raw_dp
+    else:
+        dp_val = None
 
     # Stylings and details from JSON or existing stub
     surface_styling_val = (
@@ -545,12 +584,6 @@ def build_design_rows(
     for size in sizes:
         sku = f"{sku_base}_{size}"
 
-        # Detail Placement logic
-        if dp_rows == "all" or (isinstance(dp_rows, list) and size in dp_rows):
-            cur_dp = dp_val
-        else:
-            cur_dp = None
-
         cells: Dict[str, Any] = {
             "G": sku,
             "H": group_id_val,
@@ -600,8 +633,8 @@ def build_design_rows(
             "BO": key_features_str,
         }
 
-        if cur_dp:
-            cells["BD"] = cur_dp
+        if dp_val:
+            cells["BD"] = dp_val
 
         if final_product_link:
             cells["D"] = final_product_link
@@ -620,6 +653,16 @@ def build_design_rows(
                 cells[col] = final_images[img_idx]
 
         rows.append(RowRecord(size=size, sku=sku, cells=cells))
+
+    # Intra-Group Consistency Guard:
+    # Ensure all 19 Flipkart Matching Attributes are 100% identical across all rows of this design group
+    if rows:
+        parent_cells = rows[0].cells
+        for col_code in MATCHING_ATTRIBUTE_COLS:
+            if col_code in parent_cells and parent_cells[col_code] is not None:
+                p_val = parent_cells[col_code]
+                for r in rows[1:]:
+                    r.cells[col_code] = p_val
 
     # Add candidate SKUs to existing session SKUs
     for r in rows:

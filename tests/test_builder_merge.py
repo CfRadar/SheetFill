@@ -59,11 +59,11 @@ def test_same_across_sizes(mapper, moonlight_design, sample_json):
         assert rows[i].get("Y") == "61091000"
 
 
-    # Detail placement BD written on S only by default
+    # Detail placement BD is a Matching Attribute: must be uniform across all sizes
     assert rows[0].get("BD") is not None
-    assert rows[1].get("BD") is None
-    assert rows[2].get("BD") is None
-    assert rows[3].get("BD") is None
+    assert rows[1].get("BD") == rows[0].get("BD")
+    assert rows[2].get("BD") == rows[0].get("BD")
+    assert rows[3].get("BD") == rows[0].get("BD")
 
 
 def test_detail_placement_all(mapper, moonlight_design, sample_json):

@@ -72,7 +72,8 @@ def test_api_full_flow_compare_with_2_final():
     # Group ID (Col H): 2_final.xlsm incorrectly assigned 'group 1' to all designs; now incremented per design group
     # Packer details (Col AC): 2_final.xlsm left empty; now populated
     # Style Code (Col AQ): 2_final.xlsm left empty; now populated with SKU base name
-    intentional_columns = {"AI", "BH", "BO", "BJ", "BF", "Y", "H", "AC", "AQ"}
+    # Detail Placement (Col BD): 2_final.xlsm only populated S, violating Flipkart Matching Attribute rule; now uniform across all rows of the group
+    intentional_columns = {"AI", "BH", "BO", "BJ", "BF", "Y", "H", "AC", "AQ", "BD"}
 
     unexpected_diffs = []
     for r in range(5, 37):
