@@ -53,15 +53,23 @@ class WorkflowOrchestrator:
         run_id: str,
         user_id: str,
         brief: ProductBrief,
-        emit: Callable[[str, str, str, dict | None], Coroutine[Any, Any, None]],
+        emit: Callable[[str, str, str, dict | None], Coroutine[Any, Any, None]] | None = None,
         emit_node: Callable[[str, str, str | None, dict | None], Coroutine[Any, Any, None]] | None = None,
     ) -> RunResult:
         logger.info(f"Starting pipeline execution for run_id='{run_id}', user_id='{user_id}'")
 
-        if emit_node is None:
-            async def _default_emit_node(node_id: str, status: str, detail: str | None = None, metrics: dict | None = None):
-                await event_manager.emit_node(run_id, node_id, status, detail, metrics)
-            emit_node = _default_emit_node
+        VALID_STATUSES = {"queued", "running", "success", "warning", "error", "skipped", "cached"}
+
+        async def _bound_emit(event_type: str, stage: str, message: str, data: dict | None = None):
+            await event_manager.emit(run_id, event_type, stage, message, data)
+
+        async def _bound_emit_node(node_id: str, status: str, detail: str | None = None, metrics: dict | None = None):
+            norm_status = status if status in VALID_STATUSES else ("error" if any(w in str(status).lower() for w in ("fail", "err", "fatal")) else "running")
+            await event_manager.emit_node(run_id, node_id, norm_status, detail, metrics)
+
+        # Always use the run_id-bound closures for pipeline events
+        emit = _bound_emit
+        emit_node = _bound_emit_node
 
         now = datetime.now(timezone.utc)
         u_obj_id = ObjectId(user_id) if ObjectId.is_valid(user_id) else user_id
@@ -220,7 +228,13 @@ class WorkflowOrchestrator:
                         }
                     },
                 )
-            if emit_node:
+            try:
                 await emit_node("output", "error", f"Run failed: {err}", None)
-            await emit("error", "system", f"Run failed: {err}", None)
+            except Exception as e:
+                logger.warning(f"Could not emit error node: {e}")
+
+            try:
+                await emit("error", "system", f"Run failed: {err}", None)
+            except Exception as e:
+                logger.warning(f"Could not emit error SSE event: {e}")
             raise

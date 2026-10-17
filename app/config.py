@@ -59,6 +59,15 @@ class Settings(BaseModel):
     keyword_agent_hourly_run_limit: int = int(os.getenv("KEYWORD_AGENT_HOURLY_RUN_LIMIT", "10"))
     keyword_agent_rpm_limit: int = int(os.getenv("KEYWORD_AGENT_RPM_LIMIT", "15"))
 
+    # Keyword Agent Pipeline & Scraper Defaults
+    MAX_QUERIES_PER_PLATFORM: int = 3
+    ENABLE_X: bool = False
+    ENABLE_INSTAGRAM: bool = False
+    parsed_reddit_subreddits: list[str] = ["IndianFashionAddicts", "streetwearstartup"]
+    SCRAPER_TIMEOUT_SEC: float = 12.0
+
+    model_config = {"extra": "allow"}
+
     def validate_production(self) -> None:
         """Enforces mandatory variables when running in production."""
         if self.env == "production":

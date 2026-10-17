@@ -206,8 +206,6 @@ async def create_run(
                 run_id=run_id,
                 user_id=user.id,
                 brief=brief,
-                emit=event_manager.emit,
-                emit_node=event_manager.emit_node,
             )
         except Exception as e:
             logger.error(f"Run {run_id} failed: {e}")
