@@ -495,12 +495,11 @@ Social Buzz:
                 await emit_node("analyst", "warning", "Fallback synthesis used", {"duration_ms": duration_ms})
             else:
                 from app.config import get_settings
-                settings = get_settings()
                 await emit_node(
                     "analyst",
                     "success",
                     f"{total_kws} keywords & titles generated",
-                    {"duration_ms": duration_ms, "model": settings.MODEL_ANALYST},
+                    {"duration_ms": duration_ms, "model": getattr(self.llm, "preferred_model", "openrouter")},
                 )
 
         await emit(

@@ -158,7 +158,7 @@ class PlannerAgent:
                     "planner",
                     "success",
                     "Generated queries and audience",
-                    {"duration_ms": duration_ms, "model": settings.MODEL_PLANNER},
+                    {"duration_ms": duration_ms, "model": getattr(self.llm, "preferred_model", "openrouter")},
                 )
 
             persona_summary = f"{plan.target_market.age_range}, {', '.join(plan.target_market.personas[:2])}"

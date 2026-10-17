@@ -60,6 +60,12 @@ class Settings(BaseModel):
 
     # Keyword Agent Pipeline & Scraper Defaults
     MAX_QUERIES_PER_PLATFORM: int = 3
+    MAX_PRODUCTS_PER_QUERY: int = 10
+    DELIVERY_PINCODE: str = ""
+    ENABLE_GOOGLE_SERP_SCRAPE: bool = False
+    SOURCES_ALLOW_HIGH_RISK: bool = False
+    MODEL_PLANNER: str = "openrouter"
+    MODEL_ANALYST: str = "openrouter"
     ENABLE_X: bool = False
     ENABLE_INSTAGRAM: bool = False
     parsed_reddit_subreddits: list[str] = ["IndianFashionAddicts", "streetwearstartup"]
