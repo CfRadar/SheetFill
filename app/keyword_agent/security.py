@@ -4,7 +4,10 @@ import ipaddress
 import logging
 import re
 import socket
+from typing import Optional
 from urllib.parse import urljoin, urlparse
+
+import httpx
 
 logger = logging.getLogger("sheetfill.keyword_agent.security")
 
