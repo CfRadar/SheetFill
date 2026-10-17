@@ -316,8 +316,8 @@ async def cancel_run(
             {"$set": {"status": "cancelled", "updated_at": datetime.now(timezone.utc)}},
         )
 
-    await event_manager.emit("warning", "system", "Run cancelled by user.", None, run_id=run_id)
-    await event_manager.emit("done", "system", "Execution cancelled.", None, run_id=run_id)
+    await event_manager.emit(run_id, "warning", "system", "Run cancelled by user.", None)
+    await event_manager.emit(run_id, "done", "system", "Execution cancelled.", None)
 
     return {"run_id": run_id, "cancelled": True}
 

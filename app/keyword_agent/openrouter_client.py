@@ -245,3 +245,34 @@ class OpenRouterClient:
         """Invokes chat completion and parses response into requested Pydantic schema."""
         raw_text = await self.call_chat(messages=messages, role=role, temperature=temperature)
         return parse_model(schema_cls, raw_text)
+
+    async def chat(
+        self,
+        role: Literal["planner", "analyst", "social"] = "analyst",
+        system: Optional[str] = None,
+        user: Optional[str] = None,
+        messages: Optional[list[dict[str, str]]] = None,
+        schema: Optional[type[T]] = None,
+        max_tokens: int = 2000,
+        temperature: float = 0.2,
+    ) -> Any:
+        """
+        Unified chat interface expected by agents:
+        Takes role, system, user prompt, and optional Pydantic schema.
+        If schema is provided, extracts and validates structured JSON.
+        """
+        msgs: list[dict[str, str]] = list(messages or [])
+        if system:
+            msgs.insert(0, {"role": "system", "content": system})
+        if user:
+            msgs.append({"role": "user", "content": user})
+
+        if schema is not None:
+            raw_text = await self.call_chat(
+                messages=msgs, role=role, temperature=temperature, max_tokens=max_tokens
+            )
+            return parse_model(schema, raw_text)
+        else:
+            return await self.call_chat(
+                messages=msgs, role=role, temperature=temperature, max_tokens=max_tokens
+            )
