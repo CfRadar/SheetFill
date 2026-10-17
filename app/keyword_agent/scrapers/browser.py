@@ -81,7 +81,11 @@ class BrowserManager:
             async with self._lock:
                 if self._browser is None:
                     logger.info("Launching Playwright Chromium headless...")
-                    self._playwright = await async_playwright().start()
+                    try:
+                        self._playwright = await async_playwright().start()
+                    except (NotImplementedError, Exception) as e:
+                        logger.warning(f"Playwright driver could not be started ({e}). Falling back to HTTP/JSON scrapers.")
+                        raise RuntimeError(f"Playwright unavailable on this system/event-loop: {e}")
                     browser_args = [
                         "--disable-blink-features=AutomationControlled",
                         "--disable-dev-shm-usage",

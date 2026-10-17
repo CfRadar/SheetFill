@@ -46,15 +46,14 @@ class Settings(BaseModel):
 
     # Keyword Agent (BYOK & Per-User Settings)
     keyword_agent_encryption_key: str = os.getenv("KEYWORD_AGENT_ENCRYPTION_KEY", "")
-    keyword_agent_default_model: str = os.getenv("KEYWORD_AGENT_DEFAULT_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+    keyword_agent_default_model: str = os.getenv("KEYWORD_AGENT_DEFAULT_MODEL", "meta-llama/llama-3.3-70b-instruct")
     keyword_agent_allowed_models: list[str] = [
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "google/gemini-2.0-flash-exp:free",
-        "mistralai/mistral-small-24b-instruct-2501:free",
-        "meta-llama/llama-3.1-8b-instruct:free",
-        "anthropic/claude-3.5-haiku",
+        "meta-llama/llama-3.3-70b-instruct",
         "openai/gpt-4o-mini",
         "deepseek/deepseek-chat",
+        "anthropic/claude-3.5-haiku",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "mistralai/mistral-small-24b-instruct-2501",
     ]
     keyword_agent_hourly_run_limit: int = int(os.getenv("KEYWORD_AGENT_HOURLY_RUN_LIMIT", "10"))
     keyword_agent_rpm_limit: int = int(os.getenv("KEYWORD_AGENT_RPM_LIMIT", "15"))

@@ -97,8 +97,11 @@ class GoogleSignalsAdapter(BaseSourceAdapter):
         related_searches: list[str] = []
 
         # 2. Check for optional third-party SEARCH_PROVIDER (brave / serper)
-        provider = (settings.SEARCH_PROVIDER or "none").lower()
-        provider_key = settings.SEARCH_PROVIDER_API_KEY.get_secret_value().strip()
+        provider = (getattr(settings, "SEARCH_PROVIDER", None) or "none").lower()
+        provider_key = ""
+        secret = getattr(settings, "SEARCH_PROVIDER_API_KEY", None)
+        if secret:
+            provider_key = secret.get_secret_value().strip() if hasattr(secret, "get_secret_value") else str(secret).strip()
 
         if provider == "serper" and provider_key:
             try:

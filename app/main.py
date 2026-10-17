@@ -10,8 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import asyncio
 import sys
 from pathlib import Path
+
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass
 
 # Ensure local 'src' directory containing flipkart_filler is on python path
 _src_dir = str(Path(__file__).resolve().parent.parent / "src")

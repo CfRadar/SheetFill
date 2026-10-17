@@ -171,10 +171,10 @@ class AmazonAdapter(BaseSourceAdapter):
         encoded = urllib.parse.quote_plus(query)
         url = f"https://www.amazon.in/s?k={encoded}&s=exact-aware-popularity-rank"
 
-        context = await browser_mgr.get_context("amazon")
-        page = await context.new_page()
-
+        page = None
         try:
+            context = await browser_mgr.get_context("amazon")
+            page = await context.new_page()
             is_blocked, content = await browser_mgr.polite_goto(page, url, "amazon", spec=spec)
             duration_ms = int((time.time() - start_time) * 1000)
 
@@ -216,7 +216,11 @@ class AmazonAdapter(BaseSourceAdapter):
                 note=str(e),
             )
         finally:
-            await page.close()
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
 
 
 def parse_amazon_autosuggest(data: dict) -> list[str]:

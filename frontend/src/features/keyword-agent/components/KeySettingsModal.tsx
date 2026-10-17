@@ -24,7 +24,7 @@ interface Props {
 export const KeySettingsModal: React.FC<Props> = ({ isOpen, onClose, onKeyUpdated }) => {
   const [status, setStatus] = useState<KeyStatus | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState("");
-  const [selectedModel, setSelectedModel] = useState<string>("meta-llama/llama-3.3-70b-instruct:free");
+  const [selectedModel, setSelectedModel] = useState<string>("meta-llama/llama-3.3-70b-instruct");
   const [models, setModels] = useState<string[]>([]);
   const [showKey, setShowKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

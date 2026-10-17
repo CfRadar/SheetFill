@@ -136,10 +136,12 @@ class OpenRouterClient:
     BASE_URL = "https://openrouter.ai/api/v1"
 
     DEFAULT_FREE_MODELS = [
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "google/gemini-2.0-flash-exp:free",
-        "mistralai/mistral-small-24b-instruct-2501:free",
-        "meta-llama/llama-3.1-8b-instruct:free",
+        "meta-llama/llama-3.3-70b-instruct",
+        "openai/gpt-4o-mini",
+        "deepseek/deepseek-chat",
+        "mistralai/mistral-small-24b-instruct-2501",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "anthropic/claude-3.5-haiku",
     ]
 
     def __init__(
@@ -149,7 +151,8 @@ class OpenRouterClient:
         timeout_seconds: float = 90.0,
     ):
         self.api_key = api_key.strip()
-        self.preferred_model = (preferred_model or settings.keyword_agent_default_model).strip()
+        pref = (preferred_model or settings.keyword_agent_default_model).strip()
+        self.preferred_model = pref
         self.timeout_seconds = timeout_seconds
         self.llm_calls_used: int = 0
 
@@ -158,6 +161,10 @@ class OpenRouterClient:
         chain = []
         if self.preferred_model:
             chain.append(self.preferred_model)
+            if self.preferred_model.endswith(":free"):
+                paid_slug = self.preferred_model[:-5]
+                if paid_slug not in chain:
+                    chain.append(paid_slug)
         for m in self.DEFAULT_FREE_MODELS:
             if m not in chain:
                 chain.append(m)

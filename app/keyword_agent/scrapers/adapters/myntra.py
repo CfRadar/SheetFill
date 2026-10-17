@@ -148,10 +148,10 @@ class MyntraAdapter(BaseSourceAdapter):
         clean_q = re.sub(r"[^\w\s-]", "", query).strip().replace(" ", "-")
         url = f"https://www.myntra.com/{clean_q}?sort=popularity"
 
-        context = await browser_mgr.get_context("myntra")
-        page = await context.new_page()
-
+        page = None
         try:
+            context = await browser_mgr.get_context("myntra")
+            page = await context.new_page()
             is_blocked, content = await browser_mgr.polite_goto(page, url, "myntra", spec=spec)
             duration_ms = int((time.time() - start_time) * 1000)
 
@@ -194,7 +194,11 @@ class MyntraAdapter(BaseSourceAdapter):
                 note=str(e),
             )
         finally:
-            await page.close()
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
 
 
 parse_search_html = MyntraAdapter().parse

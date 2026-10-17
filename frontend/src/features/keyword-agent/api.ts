@@ -50,11 +50,14 @@ export async function getModels(): Promise<{ default: string; allowed_models: st
   const res = await authFetch(`${KEYWORD_BASE}/models`);
   if (!res.ok) {
     return {
-      default: "meta-llama/llama-3.3-70b-instruct:free",
+      default: "meta-llama/llama-3.3-70b-instruct",
       allowed_models: [
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "google/gemini-2.0-flash-exp:free",
-        "mistralai/mistral-small-24b-instruct-2501:free",
+        "meta-llama/llama-3.3-70b-instruct",
+        "openai/gpt-4o-mini",
+        "deepseek/deepseek-chat",
+        "anthropic/claude-3.5-haiku",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "mistralai/mistral-small-24b-instruct-2501",
       ],
     };
   }

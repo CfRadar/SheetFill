@@ -206,10 +206,10 @@ class FlipkartAdapter(BaseSourceAdapter):
         encoded = urllib.parse.quote_plus(query)
         url = f"https://www.flipkart.com/search?q={encoded}&sort=popularity"
 
-        context = await browser_mgr.get_context("flipkart")
-        page = await context.new_page()
-
+        page = None
         try:
+            context = await browser_mgr.get_context("flipkart")
+            page = await context.new_page()
             is_blocked, content = await browser_mgr.polite_goto(page, url, "flipkart", spec=spec)
             duration_ms = int((time.time() - start_time) * 1000)
 
@@ -245,7 +245,11 @@ class FlipkartAdapter(BaseSourceAdapter):
                 note=str(e),
             )
         finally:
-            await page.close()
+            if page:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
 
 
 parse_search_html = FlipkartAdapter().parse
