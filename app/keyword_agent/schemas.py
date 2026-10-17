@@ -123,18 +123,53 @@ class ProductBrief(BaseModel):
 
 
 class TargetMarket(BaseModel):
-    age_range: str
-    personas: list[str]
-    interests: list[str]
-    regions: list[str]
-    language_notes: str
+    age_range: str = "18-35"
+    personas: list[str] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
+    regions: list[str] = Field(default_factory=lambda: ["Pan-India"])
+    language_notes: str = ""
 
 
 class SearchPlan(BaseModel):
-    target_market: TargetMarket
-    marketplace_queries: dict[PlatformName, list[str]]
-    social_queries: list[str]
-    seed_keywords: list[str]
+    target_market: TargetMarket = Field(default_factory=TargetMarket)
+    marketplace_queries: dict[PlatformName, list[str]] = Field(default_factory=dict)
+    social_queries: list[str] = Field(default_factory=list)
+    seed_keywords: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reformat_llm_output(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        # If LLM returned platform keys at root instead of under marketplace_queries
+        valid_platforms = {"amazon", "flipkart", "myntra", "meesho"}
+        detected_queries = {}
+        for p in list(data.keys()):
+            if p in valid_platforms and isinstance(data[p], list):
+                detected_queries[p] = data.pop(p)
+
+        if detected_queries:
+            mk = data.setdefault("marketplace_queries", {})
+            if isinstance(mk, dict):
+                mk.update(detected_queries)
+
+        if "target_market" not in data or not isinstance(data["target_market"], dict):
+            data["target_market"] = {
+                "age_range": "18-35",
+                "personas": ["Casual Shoppers", "Fashion Enthusiasts"],
+                "interests": ["Casual wear", "Streetwear"],
+                "regions": ["Pan-India"],
+                "language_notes": "",
+            }
+
+        if "marketplace_queries" not in data or not isinstance(data["marketplace_queries"], dict):
+            data["marketplace_queries"] = {}
+        if "social_queries" not in data or not isinstance(data["social_queries"], list):
+            data["social_queries"] = []
+        if "seed_keywords" not in data or not isinstance(data["seed_keywords"], list):
+            data["seed_keywords"] = []
+        return data
 
 
 class ScrapedProduct(BaseModel):

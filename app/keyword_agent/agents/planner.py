@@ -9,14 +9,32 @@ logger = logging.getLogger("backend.agents.planner")
 
 SYSTEM_PROMPT_TEMPLATE = """You are an e-commerce market analyst for Indian fashion marketplaces.
 Given a T-shirt brief, infer the target market and produce search queries
-that a real Indian shopper would type on Amazon.in, Myntra and Flipkart.
+that a real Indian shopper would type on Amazon.in, Myntra, Flipkart and Meesho.
 Rules:
 - Queries must be 2-6 words, lowercase, realistic shopper language (include Hinglish only if natural).
 - Max {MAX_QUERIES_PER_PLATFORM} queries per requested platform, no duplicates, mix: 1 broad, 2 specific (type+color / fit), 1-2 long-tail (occasion/design).
 - Max 5 social queries (for Reddit/X/Instagram discussions and hashtags).
 - seed_keywords: 10-20 core terms from the brief.
 - Do not invent facts about the product. Do not use brand/celebrity names unless given in the brief.
-Return JSON matching the schema."""
+
+Return ONLY a valid JSON object matching this exact structure:
+{{
+  "target_market": {{
+    "age_range": "18-35",
+    "personas": ["College Students", "Urban Shoppers"],
+    "interests": ["Streetwear", "Graphic Tees"],
+    "regions": ["Pan-India", "Metro Cities"],
+    "language_notes": "Shopper terms"
+  }},
+  "marketplace_queries": {{
+    "amazon": ["..."],
+    "flipkart": ["..."],
+    "myntra": ["..."],
+    "meesho": ["..."]
+  }},
+  "social_queries": ["..."],
+  "seed_keywords": ["..."]
+}}"""
 
 
 class PlannerAgent:
@@ -97,7 +115,7 @@ class PlannerAgent:
                 "Search queries and target market generated successfully.",
                 None,
             )
-        except (QuotaExceeded, LLMCallError) as e:
+        except Exception as e:
             fallback_used = True
             logger.warning(
                 f"Planner LLM failed or quota exceeded ({e}). Using deterministic fallback plan."

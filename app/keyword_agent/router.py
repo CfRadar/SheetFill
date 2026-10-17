@@ -76,7 +76,13 @@ async def _get_user_run_doc(run_id: str, user_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail="Database connection unavailable.")
 
     db = get_db()
-    doc = await db.keyword_agent_runs.find_one({"run_id": run_id})
+    doc = None
+    for _ in range(5):
+        doc = await db.keyword_agent_runs.find_one({"run_id": run_id})
+        if doc:
+            break
+        await asyncio.sleep(0.1)
+
     if not doc:
         raise HTTPException(status_code=404, detail="Run not found.")
 
@@ -195,11 +201,32 @@ async def create_run(
     # 2. Acquire per-user rate limit slot (max 1 concurrent, 10/hour)
     await acquire_user_run_slot(user.id, run_id)
 
-    # 3. Create BYOK client and orchestrator
+    # 3. Save initial run doc in MongoDB synchronously so SSE can connect without race conditions
+    if is_db_connected():
+        db = get_db()
+        now = datetime.now(timezone.utc)
+        u_obj_id = ObjectId(user.id) if ObjectId.is_valid(user.id) else user.id
+        await db.keyword_agent_runs.update_one(
+            {"run_id": run_id},
+            {
+                "$set": {
+                    "run_id": run_id,
+                    "user_id": u_obj_id,
+                    "brief": brief.model_dump(),
+                    "status": "running",
+                    "result": None,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            },
+            upsert=True,
+        )
+
+    # 4. Create BYOK client and orchestrator
     llm_client = OpenRouterClient(api_key=plain_key, preferred_model=preferred_model)
     orchestrator = WorkflowOrchestrator(llm_client=llm_client)
 
-    # 4. Define background task with slot release guarantee
+    # 5. Define background task with slot release guarantee
     async def _execute_pipeline():
         try:
             await orchestrator.run_pipeline(
