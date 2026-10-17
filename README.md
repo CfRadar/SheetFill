@@ -213,3 +213,42 @@ python -m flipkart_filler show-allowed --attribute "Pattern"
 > [!TIP]
 > **Next Step in Excel:**
 > Open the generated `.xlsm` file in Microsoft Excel, navigate to the `t_shirt` sheet, press **Ctrl+Shift+S** (Fast Validate) to run the template's built-in validation macro, and then upload to the Flipkart Seller Portal.
+
+---
+
+## 8. Marketplace Keyword Agent (Multi-Agent SEO & BYOK)
+
+The application includes an integrated **Marketplace Keyword Agent** for automated competitor research, mathematical keyword scoring, and deterministic listing title composition across **Amazon, Flipkart, Myntra, and Meesho**.
+
+### Architecture & Pipeline
+1. **Planner Agent**: Analyzes the product brief, normalizes silhouettes, and structures search intent.
+2. **Scraper Agent**: Gathers live search suggestions and competitor titles (using HTTP/JSON extractors with Playwright headless fallback).
+3. **5-Factor Mathematical Scorer**: Computes keyword rankings deterministically:
+   - Search Autocomplete Suggest (35%)
+   - Competitor Title Frequency (25%)
+   - Review Themes & Sentiments (20%)
+   - Social Buzz / Reddit / Google Trends (10%)
+   - Brief Alignment (10%)
+4. **Deterministic Title Engine**: Strictly enforces platform character limits and composition formulas from `app/keyword_agent/titles/rules.yaml`. Automatically drops promotional/unsupported claims (e.g. "bestseller", "cheap", "guaranteed") and validates allowed vocabulary.
+
+### Strict BYOK (Bring Your Own Key) Model
+- **Zero Master Key**: The server never stores or uses a global OpenRouter API key.
+- **Per-User Encryption**: Every user configures their own OpenRouter key in the UI. Keys are encrypted at rest with Fernet AES in MongoDB (`keyword_agent_user_keys` collection).
+- **Zero Leakage**: Plaintext keys are never logged, returned in API responses, or stored in browser storage.
+- **Key Configuration**:
+  ```bash
+  # Generate a secure Fernet encryption key for your environment
+  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  ```
+  Add the generated key to your `.env` file as `KEYWORD_AGENT_ENCRYPTION_KEY`.
+
+### Security & CSV Defenses
+- **SSRF Defense**: Live scrapers use `SafeAsyncClient` with an explicit domain allowlist and private IP blocking (blocks access to `127.0.0.1`, `169.254.169.254`, `10.0.0.0/8`, etc.).
+- **CSV Formula Injection Defense**: All exported cells starting with `=`, `+`, `-`, `@`, `\t`, or `\r` are prefixed with `'` to neutralize Excel/Sheets execution vulnerabilities.
+- **Zero Leakage Filter**: Custom logging filter intercepts and redacts `sk-or-` tokens and `Authorization` headers.
+
+### Running Security & Hygiene Audits
+```bash
+# Verify zero secret leaks or global key reads
+python .agent/skills/clothscrapper-merge/scripts/check_byok_hygiene.py flipkart-tshirt-filler
+```
