@@ -288,9 +288,12 @@ class DesignStore:
         manufacturer: Optional[str] = None,
         packer: Optional[str] = None,
         hsn: Optional[str] = None,
+        mrp: Optional[str] = None,
+        selling_price: Optional[str] = None,
+        sleeve: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
-        """Updates brand, manufacturer, packer, and HSN for a specific design."""
+        """Updates brand, manufacturer, packer, HSN, MRP, selling price, and sleeve for a specific design."""
         state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
@@ -304,6 +307,12 @@ class DesignStore:
             cur["packer"] = packer.strip()
         if hsn is not None:
             cur["hsn"] = hsn.strip()
+        if mrp is not None:
+            cur["mrp"] = str(mrp).strip()
+        if selling_price is not None:
+            cur["selling_price"] = str(selling_price).strip()
+        if sleeve is not None:
+            cur["sleeve"] = sleeve.strip()
         state.design_meta[design_id] = cur
 
         self._invalidate_generated_output(state)
@@ -317,9 +326,12 @@ class DesignStore:
         manufacturer: Optional[str] = None,
         packer: Optional[str] = None,
         hsn: Optional[str] = None,
+        mrp: Optional[str] = None,
+        selling_price: Optional[str] = None,
+        sleeve: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> Optional[SessionState]:
-        """Applies brand, manufacturer, packer, and HSN to all designs and updates global_meta."""
+        """Applies brand, manufacturer, packer, HSN, MRP, selling price, and sleeve to all designs and updates global_meta."""
         state = self.get_session(session_id, user_id=user_id)
         if not state:
             return None
@@ -333,6 +345,12 @@ class DesignStore:
             meta["packer"] = packer.strip()
         if hsn is not None:
             meta["hsn"] = hsn.strip()
+        if mrp is not None:
+            meta["mrp"] = str(mrp).strip()
+        if selling_price is not None:
+            meta["selling_price"] = str(selling_price).strip()
+        if sleeve is not None:
+            meta["sleeve"] = sleeve.strip()
 
         state.global_meta = meta
         for d in state.designs:

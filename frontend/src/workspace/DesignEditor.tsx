@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardHeader,
@@ -21,7 +21,7 @@ import {
   Image as ImageIcon,
   CheckCircle2,
 } from "lucide-react";
-import { deleteDesign, saveDesignImages, saveDesignSizes } from "../api";
+import { deleteDesign, saveDesignImages, saveDesignSizes, saveDesignJson } from "../api";
 import { useAppStore } from "../store";
 import { DetectedDesign, PreviewRow } from "../types";
 import { StatusChip } from "../ui/StatusChip";
@@ -70,12 +70,54 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
 
   const initialJsonText = session?.design_raw_text[design.id] || "";
 
+  // Keep sizes local state in sync when active design changes
+  useEffect(() => {
+    setSizes(resolveDesignSizes(session?.design_sizes[design.id], design.sizes_found));
+  }, [design.id, session?.design_sizes]);
+
+  // Load preview rows if json already present and previewRows is currently empty
+  useEffect(() => {
+    let isMounted = true;
+    if (session && session.design_jsons[design.id]) {
+      const currentRaw = session.design_raw_text[design.id];
+      if (currentRaw && currentRaw.trim()) {
+        saveDesignJson(session.session_id, design.id, currentRaw)
+          .then((res) => {
+            if (isMounted && res?.preview_rows?.length) {
+              setPreviewRows(res.preview_rows);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [design.id, session?.session_id]);
+
   const handleToggleSize = async (size: string) => {
     const next = sizes.includes(size) ? sizes.filter((s) => s !== size) : [...sizes, size];
     if (next.length === 0) return; // Minimum 1 size required
     setSizes(next);
     if (session) {
-      await saveDesignSizes(session.session_id, design.id, next);
+      try {
+        const res = await saveDesignSizes(session.session_id, design.id, next);
+        if (res?.preview_rows && res.preview_rows.length > 0) {
+          setPreviewRows(res.preview_rows);
+        }
+        if (res?.design) {
+          design.status = res.design.status;
+        }
+        setSession({
+          ...session,
+          design_sizes: {
+            ...session.design_sizes,
+            [design.id]: next,
+          },
+        });
+      } catch (err: any) {
+        setError(err?.message || "Failed to update sizes");
+      }
     }
   };
 

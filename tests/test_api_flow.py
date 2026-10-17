@@ -209,3 +209,27 @@ def test_api_meta_brand_manufacturer_hsn_endpoints():
     assert sess_data["design_meta"]["d1"]["brand"] == "GlobalBrand"
     assert sess_data["design_meta"]["d1"]["hsn"] == "61091000"
 
+
+def test_api_sizes_update_live_preview():
+    xls_path = FIXTURES_DIR / "1_before.xls"
+    with open(xls_path, "rb") as f:
+        resp = client.post("/api/sheets/analyze", files={"file": ("1_before.xls", f, "application/vnd.ms-excel")})
+    assert resp.status_code == 200
+    sid = resp.json()["session_id"]
+
+    # Put JSON for d1
+    sample_json = (FIXTURES_DIR / "moonlight.json").read_text(encoding="utf-8")
+    resp = client.put(f"/api/sheets/{sid}/designs/d1/json", json={"raw_text": sample_json})
+    assert resp.status_code == 200
+    assert len(resp.json()["preview_rows"]) == 4
+
+    # Now update sizes to 5 sizes: S, M, L, XL, XXL
+    resp = client.put(f"/api/sheets/{sid}/designs/d1/sizes", json={"sizes": ["S", "M", "L", "XL", "XXL"]})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "preview_rows" in data
+    assert len(data["preview_rows"]) == 5
+    sizes_in_preview = [r["size"] for r in data["preview_rows"]]
+    assert sizes_in_preview == ["S", "M", "L", "XL", "XXL"]
+
+

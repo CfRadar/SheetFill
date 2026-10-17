@@ -1,6 +1,7 @@
 import {
   BrandMeta,
   BulkAssignResponse,
+  PreviewRow,
   PutJsonResponse,
   SessionState,
 } from "./types";
@@ -164,7 +165,11 @@ export async function saveDesignImages(
   }
 }
 
-export async function saveDesignSizes(sessionId: string, designId: string, sizes: string[]): Promise<void> {
+export async function saveDesignSizes(
+  sessionId: string,
+  designId: string,
+  sizes: string[]
+): Promise<{ status: string; design: any; preview_rows: PreviewRow[]; design_sizes?: string[] }> {
   const res = await authFetch(`${BASE_URL}/sheets/${sessionId}/designs/${designId}/sizes`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -174,6 +179,7 @@ export async function saveDesignSizes(sessionId: string, designId: string, sizes
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message || "Failed to save sizes");
   }
+  return res.json();
 }
 
 export async function bulkAssignJson(sessionId: string, rawText: string): Promise<BulkAssignResponse> {
@@ -317,6 +323,10 @@ export async function saveUserBrandDefaults(defaults: {
   brand?: string;
   manufacturer?: string;
   packer?: string;
+  hsn?: string;
+  mrp?: string | number;
+  selling_price?: string | number;
+  sleeve?: string;
 }): Promise<any> {
   const res = await authFetch(`${BASE_URL}/auth/brand-defaults`, {
     method: "PUT",

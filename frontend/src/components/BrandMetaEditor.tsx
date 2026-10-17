@@ -10,7 +10,8 @@ interface BrandMetaEditorProps {
 }
 
 const HSN_PRESETS = [
-  { code: "61091000", label: "61091000 (Cotton T-shirts - Recommended)" },
+  { code: "610910", label: "610910 (Cotton T-shirts - Recommended)" },
+  { code: "61091000", label: "61091000 (8-digit Cotton T-shirts)" },
   { code: "61099010", label: "61099010 (Blends & Synthetic T-shirts)" },
   { code: "6109", label: "6109 (General 4-digit heading)" },
 ];
@@ -28,7 +29,7 @@ export const BrandMetaEditor: React.FC<BrandMetaEditorProps> = ({
     currentMeta.hsn ||
     (() => {
       const existY = strClean(design.existing_values?.["Y"]);
-      return existY && !isNaN(Number(existY)) ? existY : "61091000";
+      return existY && !isNaN(Number(existY)) ? existY : "610910";
     })();
 
   const initialBrand =

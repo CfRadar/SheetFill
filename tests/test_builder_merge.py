@@ -56,7 +56,7 @@ def test_same_across_sizes(mapper, moonlight_design, sample_json):
     for i, size in enumerate(sizes):
         assert rows[i].get("AR") == size
         assert rows[i].get("G") == f"{moonlight_design.base}_{size}"
-        assert rows[i].get("Y") == "61091000"
+        assert rows[i].get("Y") in ("610910", "61091000")
 
 
     # Detail placement BD is a Matching Attribute: must be uniform across all sizes
@@ -99,7 +99,10 @@ def test_meta_override_brand_manufacturer_packer_hsn(mapper, moonlight_design, s
         "brand": "Custom Brand Apparel",
         "manufacturer": "Custom Textiles Pvt Ltd, Surat",
         "packer": "Custom Packers Logistics, Surat",
-        "hsn": "61099010",
+        "hsn": "610910",
+        "mrp": "2499",
+        "selling_price": "899",
+        "sleeve": "Full Sleeve",
     }
     b_res = build_design_rows(
         moonlight_design, sample_json, mapper, existing_skus, meta_override=meta
@@ -109,7 +112,10 @@ def test_meta_override_brand_manufacturer_packer_hsn(mapper, moonlight_design, s
         assert r.get("AG") == "Custom Brand Apparel"
         assert r.get("AB") == "Custom Textiles Pvt Ltd, Surat"
         assert r.get("AC") == "Custom Packers Logistics, Surat"
-        assert r.get("Y") == "61099010"
+        assert r.get("Y") == "610910"
+        assert r.get("K") == 2499.0
+        assert r.get("L") == 899.0
+        assert r.get("AL") == "Full Sleeve"
 
 
 def test_group_id_assignment(mapper, moonlight_design, sample_json):

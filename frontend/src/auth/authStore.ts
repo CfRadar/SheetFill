@@ -12,6 +12,10 @@ export interface CurrentUser {
     brand?: string;
     manufacturer?: string;
     packer?: string;
+    hsn?: string;
+    mrp?: string | number;
+    selling_price?: string | number;
+    sleeve?: string;
   } | null;
 }
 

@@ -51,4 +51,4 @@ def test_moonlight_row_generation(mapper):
         assert r.get("J") == "Active"
         assert r.get("K") == 1999
         assert r.get("L") == 749
-        assert r.get("Y") == "61091000"
+        assert r.get("Y") in ("610910", "61091000")

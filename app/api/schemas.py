@@ -1,6 +1,6 @@
 """Pydantic v2 schemas for API requests and responses."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 from app.services.design_detector import DetectedDesign, DetectionSummary
@@ -48,6 +48,9 @@ class BrandMetaRequest(BaseModel):
     manufacturer: Optional[str] = None
     packer: Optional[str] = None
     hsn: Optional[str] = None
+    mrp: Optional[Union[str, float, int]] = None
+    selling_price: Optional[Union[str, float, int]] = None
+    sleeve: Optional[str] = None
 
 
 class AddSlotsRequest(BaseModel):

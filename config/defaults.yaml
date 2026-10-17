@@ -1,7 +1,7 @@
 sizes: [S, M, L, XL]
 group_id: "group 1"
 hsn_mode: fixed            # fixed | sku
-hsn_fixed: "61091000"       # Official Flipkart apparel HSN code for T-shirts (Cotton: 61091000 / Blend: 61099010)
+hsn_fixed: "610910"         # Official Flipkart apparel HSN code for Cotton T-shirts (610910)
 listing_status: Active
 mrp: 1999
 selling_price: 749

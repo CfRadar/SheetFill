@@ -51,6 +51,9 @@ export interface BrandMeta {
   manufacturer?: string;
   packer?: string;
   hsn?: string;
+  mrp?: string | number;
+  selling_price?: string | number;
+  sleeve?: string;
 }
 
 export interface ValidationIssue {

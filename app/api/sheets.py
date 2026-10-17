@@ -394,7 +394,47 @@ def put_design_sizes(
     updated = store.save_design_sizes(sid, did, req.sizes, user_id=user.id)
     if not updated:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
-    return {"status": "ok", "design": next((d for d in updated.designs if d.id == did), None)}
+
+    target_design = next((d for d in updated.designs if d.id == did), None)
+    preview_rows = []
+    if target_design and did in updated.design_jsons:
+        mapper = get_default_mapper(_get_master_template_path())
+        meta_override = dict(updated.global_meta or {})
+        meta_override.update(updated.design_meta.get(did, {}))
+        target_idx = next((i + 1 for i, d in enumerate(updated.designs) if d.id == did), 1)
+        b_res = build_design_rows(
+            design=target_design,
+            json_data=updated.design_jsons[did],
+            mapper=mapper,
+            existing_skus_in_session=set(),
+            custom_sizes=req.sizes,
+            image_edits=updated.design_image_edits.get(did),
+            product_link_edit=updated.design_product_links.get(did),
+            meta_override=meta_override,
+            design_index=target_idx,
+        )
+        store.save_design_json(
+            session_id=sid,
+            design_id=did,
+            raw_text=updated.design_raw_text.get(did, ""),
+            parsed_json=updated.design_jsons[did],
+            status=b_res.status,
+            warnings=[w.message for w in b_res.warnings],
+            errors=[e.message for e in b_res.errors],
+            user_id=user.id,
+        )
+        preview_rows = [
+            PreviewRow(sheet_row_index=r.row_index, size=r.size, cells=r.cells)
+            for r in b_res.rows
+        ]
+        updated = store.get_session(sid, user_id=user.id)
+
+    return {
+        "status": "ok",
+        "design": next((d for d in updated.designs if d.id == did), None),
+        "preview_rows": preview_rows,
+        "design_sizes": updated.design_sizes.get(did, req.sizes),
+    }
 
 
 @router.put("/sheets/{sid}/designs/{did}/meta")
@@ -419,6 +459,9 @@ def put_design_meta(
         manufacturer=req.manufacturer,
         packer=req.packer,
         hsn=req.hsn,
+        mrp=str(req.mrp) if req.mrp is not None else None,
+        selling_price=str(req.selling_price) if req.selling_price is not None else None,
+        sleeve=req.sleeve,
         user_id=user.id,
     )
     if not updated:
@@ -482,6 +525,9 @@ def apply_meta_all(
         manufacturer=req.manufacturer,
         packer=req.packer,
         hsn=req.hsn,
+        mrp=str(req.mrp) if req.mrp is not None else None,
+        selling_price=str(req.selling_price) if req.selling_price is not None else None,
+        sleeve=req.sleeve,
         user_id=user.id,
     )
     if not updated:
@@ -499,6 +545,14 @@ def apply_meta_all(
                 updates["brand_defaults.manufacturer"] = req.manufacturer.strip()
             if req.packer is not None:
                 updates["brand_defaults.packer"] = req.packer.strip()
+            if req.hsn is not None:
+                updates["brand_defaults.hsn"] = req.hsn.strip()
+            if req.mrp is not None:
+                updates["brand_defaults.mrp"] = str(req.mrp).strip()
+            if req.selling_price is not None:
+                updates["brand_defaults.selling_price"] = str(req.selling_price).strip()
+            if req.sleeve is not None:
+                updates["brand_defaults.sleeve"] = req.sleeve.strip()
             if updates:
                 import asyncio
                 from bson import ObjectId

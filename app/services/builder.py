@@ -319,7 +319,17 @@ def build_design_rows(
             warnings.append(ideal_issue)
 
     # Map sleeve
-    sleeve_input = json_data.get("sleeve_type") or design.existing_values.get("AL") or "Half Sleeve"
+    sleeve_override = (
+        (meta_override.get("sleeve") or meta_override.get("sleeve_type"))
+        if meta_override else None
+    )
+    sleeve_input = (
+        (str(sleeve_override).strip() if sleeve_override and str(sleeve_override).strip() else None)
+        or json_data.get("sleeve_type")
+        or json_data.get("sleeve")
+        or design.existing_values.get("AL")
+        or "Half Sleeve"
+    )
     mapped_sleeve, sleeve_issue = mapper.map_attribute("sleeve", sleeve_input)
     if sleeve_issue:
         if sleeve_issue.level == "ERROR":
@@ -497,16 +507,36 @@ def build_design_rows(
     pkg = defaults.get("package_cm", {})
     hsn_mode = defaults.get("hsn_mode", "sku")
 
-    mrp_val = float(
-        json_data.get("mrp")
-        if json_data.get("mrp") is not None
-        else design.existing_values.get("K", defaults.get("mrp", 1999))
+    meta_mrp = (meta_override.get("mrp") if meta_override else None)
+    if meta_mrp is not None and str(meta_mrp).strip():
+        try:
+            mrp_val = float(str(meta_mrp).strip())
+        except (ValueError, TypeError):
+            mrp_val = float(defaults.get("mrp", 1999))
+    elif json_data.get("mrp") is not None:
+        try:
+            mrp_val = float(json_data["mrp"])
+        except (ValueError, TypeError):
+            mrp_val = float(defaults.get("mrp", 1999))
+    else:
+        mrp_val = float(design.existing_values.get("K", defaults.get("mrp", 1999)))
+
+    meta_sp = (
+        (meta_override.get("selling_price") or meta_override.get("your_selling_price"))
+        if meta_override else None
     )
-    sp_val = float(
-        json_data.get("selling_price")
-        if json_data.get("selling_price") is not None
-        else design.existing_values.get("L", defaults.get("selling_price", 749))
-    )
+    if meta_sp is not None and str(meta_sp).strip():
+        try:
+            sp_val = float(str(meta_sp).strip())
+        except (ValueError, TypeError):
+            sp_val = float(defaults.get("selling_price", 749))
+    elif json_data.get("selling_price") is not None:
+        try:
+            sp_val = float(json_data["selling_price"])
+        except (ValueError, TypeError):
+            sp_val = float(defaults.get("selling_price", 749))
+    else:
+        sp_val = float(design.existing_values.get("L", defaults.get("selling_price", 749)))
 
     # Brand (Col AG), Manufacturer (Col AB), Packer (Col AC) resolution:
     # Priority: meta_override > json_data > (sheet existing_values if not template default) > defaults
@@ -551,11 +581,11 @@ def build_design_rows(
         hsn_val = str(hsn_override).strip()
     else:
         exist_y = str(design.existing_values.get("Y") or "").strip()
-        # If existing value is purely numeric (like 6109, 61091000), keep it; if it is SKU-like (has letters), discard
+        # If existing value is purely numeric (like 6109, 610910, 61091000), keep it; if it is SKU-like (has letters), discard
         if exist_y and exist_y.replace(".", "").isdigit():
             hsn_val = exist_y
         else:
-            hsn_val = str(defaults.get("hsn_fixed") or "61091000").strip()
+            hsn_val = str(defaults.get("hsn_fixed") or "610910").strip()
 
     # Group ID: each design gets a unique group: group 1, group 2, group 3, ...
     # Determine index from design_index if provided, or from design.id (e.g. "d1" -> 1, "d2" -> 2)
