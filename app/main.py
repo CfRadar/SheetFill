@@ -21,10 +21,14 @@ if _src_dir not in sys.path:
 from app.admin import router as admin_router
 from app.api.sheets import router as sheets_router
 from app.auth import router as auth_router
+from app.keyword_agent.router import router as keyword_agent_router
+from app.keyword_agent.security import SecretRedactingFilter
 from app.config import settings
 from app.db import close_db, connect_and_init_db, is_db_connected
 
 logger = logging.getLogger("sheetfill.main")
+# Apply secret redaction filter across root logger
+logging.getLogger().addFilter(SecretRedactingFilter())
 
 
 @asynccontextmanager
@@ -147,6 +151,7 @@ async def get_version() -> Dict[str, Any]:
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(sheets_router)
+app.include_router(keyword_agent_router)
 
 # Mount frontend build if it exists
 frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"

@@ -44,6 +44,21 @@ class Settings(BaseModel):
     env: str = os.getenv("ENV", "development").lower()
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))
 
+    # Keyword Agent (BYOK & Per-User Settings)
+    keyword_agent_encryption_key: str = os.getenv("KEYWORD_AGENT_ENCRYPTION_KEY", "")
+    keyword_agent_default_model: str = os.getenv("KEYWORD_AGENT_DEFAULT_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+    keyword_agent_allowed_models: list[str] = [
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemini-2.0-flash-exp:free",
+        "mistralai/mistral-small-24b-instruct-2501:free",
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "anthropic/claude-3.5-haiku",
+        "openai/gpt-4o-mini",
+        "deepseek/deepseek-chat",
+    ]
+    keyword_agent_hourly_run_limit: int = int(os.getenv("KEYWORD_AGENT_HOURLY_RUN_LIMIT", "10"))
+    keyword_agent_rpm_limit: int = int(os.getenv("KEYWORD_AGENT_RPM_LIMIT", "15"))
+
     def validate_production(self) -> None:
         """Enforces mandatory variables when running in production."""
         if self.env == "production":
@@ -54,9 +69,17 @@ class Settings(BaseModel):
                 errors.append("JWT_SECRET must be set to a secure string with at least 32 characters in production.")
             if not self.admin_password_hash:
                 errors.append("ADMIN_PASSWORD_HASH is required in production.")
+            if not self.keyword_agent_encryption_key:
+                errors.append("KEYWORD_AGENT_ENCRYPTION_KEY is required in production for BYOK encryption at rest.")
             if errors:
                 error_msg = "\n".join(f" - {e}" for e in errors)
                 raise RuntimeError(f"Startup Configuration Errors:\n{error_msg}")
 
 
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    """Returns application settings singleton."""
+    return settings
+
