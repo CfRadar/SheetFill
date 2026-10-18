@@ -1,8 +1,10 @@
 import React, { useEffect } from "react";
 import { useAuthStore } from "./authStore";
+import { useAppStore } from "../store";
 import { LoginPage } from "./LoginPage";
 import { AdminDashboard } from "../admin/AdminDashboard";
 import { AppShell } from "../ui/AppShell";
+import { KeywordAgentPage } from "../features/keyword-agent";
 
 interface Props {
   children: React.ReactNode;
@@ -10,6 +12,7 @@ interface Props {
 
 export const AuthGate: React.FC<Props> = ({ children }) => {
   const { token, user, checkSession } = useAuthStore();
+  const { activeSection, setActiveSection } = useAppStore();
 
   // Periodic session watcher: poll every 60s and on window focus
   useEffect(() => {
@@ -32,20 +35,36 @@ export const AuthGate: React.FC<Props> = ({ children }) => {
     };
   }, [token, checkSession]);
 
+  // Set default section for admin on first load
+  useEffect(() => {
+    if (user?.role === "admin" && activeSection === "sheets") {
+      setActiveSection("admin");
+    }
+  }, [user?.role, activeSection, setActiveSection]);
+
   // 1. Unauthenticated: render unified Login Page
   if (!token || !user) {
     return <LoginPage />;
   }
 
-  // 2. Role-based routing: Admin goes directly to AdminDashboard wrapped in AppShell
-  if (user.role === "admin") {
-    return (
-      <AppShell title="Admin">
-        <AdminDashboard />
-      </AppShell>
-    );
-  }
+  // 2. Determine AppShell title
+  const title =
+    activeSection === "admin"
+      ? "Admin Dashboard"
+      : activeSection === "keyword-agent"
+      ? "Marketplace Keyword Agent"
+      : "Flipkart Sheet Filler";
 
-  // 3. Subscribers (role="user") go directly to App wrapped in AppShell
-  return <AppShell title="Flipkart Sheet Filler">{children}</AppShell>;
+  // 3. Render section based on activeSection
+  return (
+    <AppShell title={title}>
+      {activeSection === "admin" && user.role === "admin" ? (
+        <AdminDashboard />
+      ) : activeSection === "keyword-agent" ? (
+        <KeywordAgentPage />
+      ) : (
+        children
+      )}
+    </AppShell>
+  );
 };

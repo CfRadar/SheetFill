@@ -44,6 +44,35 @@ class Settings(BaseModel):
     env: str = os.getenv("ENV", "development").lower()
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))
 
+    # Keyword Agent (BYOK & Per-User Settings)
+    keyword_agent_encryption_key: str = os.getenv("KEYWORD_AGENT_ENCRYPTION_KEY", "")
+    keyword_agent_default_model: str = os.getenv("KEYWORD_AGENT_DEFAULT_MODEL", "meta-llama/llama-3.3-70b-instruct")
+    keyword_agent_allowed_models: list[str] = [
+        "meta-llama/llama-3.3-70b-instruct",
+        "openai/gpt-4o-mini",
+        "deepseek/deepseek-chat",
+        "anthropic/claude-3.5-haiku",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "mistralai/mistral-small-24b-instruct-2501",
+    ]
+    keyword_agent_hourly_run_limit: int = int(os.getenv("KEYWORD_AGENT_HOURLY_RUN_LIMIT", "10"))
+    keyword_agent_rpm_limit: int = int(os.getenv("KEYWORD_AGENT_RPM_LIMIT", "15"))
+
+    # Keyword Agent Pipeline & Scraper Defaults
+    MAX_QUERIES_PER_PLATFORM: int = 3
+    MAX_PRODUCTS_PER_QUERY: int = 10
+    DELIVERY_PINCODE: str = ""
+    ENABLE_GOOGLE_SERP_SCRAPE: bool = False
+    SOURCES_ALLOW_HIGH_RISK: bool = False
+    MODEL_PLANNER: str = "openrouter"
+    MODEL_ANALYST: str = "openrouter"
+    ENABLE_X: bool = False
+    ENABLE_INSTAGRAM: bool = False
+    parsed_reddit_subreddits: list[str] = ["IndianFashionAddicts", "streetwearstartup"]
+    SCRAPER_TIMEOUT_SEC: float = 12.0
+
+    model_config = {"extra": "allow"}
+
     def validate_production(self) -> None:
         """Enforces mandatory variables when running in production."""
         if self.env == "production":
@@ -54,9 +83,17 @@ class Settings(BaseModel):
                 errors.append("JWT_SECRET must be set to a secure string with at least 32 characters in production.")
             if not self.admin_password_hash:
                 errors.append("ADMIN_PASSWORD_HASH is required in production.")
+            if not self.keyword_agent_encryption_key:
+                errors.append("KEYWORD_AGENT_ENCRYPTION_KEY is required in production for BYOK encryption at rest.")
             if errors:
                 error_msg = "\n".join(f" - {e}" for e in errors)
                 raise RuntimeError(f"Startup Configuration Errors:\n{error_msg}")
 
 
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    """Returns application settings singleton."""
+    return settings
+

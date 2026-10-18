@@ -91,6 +91,20 @@ async def _ensure_indexes(db: AsyncIOMotorDatabase) -> None:
         await db.login_attempts.create_index("key", unique=True)
         await db.login_attempts.create_index("expires_at", expireAfterSeconds=0)
 
+        # 5. keyword_agent_user_keys: unique user_id
+        await db.keyword_agent_user_keys.create_index("user_id", unique=True)
+
+        # 6. keyword_agent_runs: user ownership and run lookup
+        await db.keyword_agent_runs.create_index("run_id", unique=True)
+        await db.keyword_agent_runs.create_index([("user_id", 1), ("created_at", -1)])
+
+        # 7. keyword_agent_cache: unique cache key and TTL expiration
+        await db.keyword_agent_cache.create_index("key", unique=True)
+        await db.keyword_agent_cache.create_index("expires_at", expireAfterSeconds=0)
+
+        # 8. keyword_agent_usage: per-user daily call counter
+        await db.keyword_agent_usage.create_index([("user_id", 1), ("day", 1)], unique=True)
+
         logger.info("MongoDB indexes verified and created successfully.")
     except Exception as e:
         logger.error(f"Failed to create MongoDB indexes: {e}")

@@ -1,0 +1,171 @@
+import logging
+from typing import Any, Callable, Coroutine
+
+from app.config import get_settings
+from app.keyword_agent.openrouter_client import LLMCallError, OpenRouterClient, QuotaExceeded
+from app.keyword_agent.schemas import PlatformName, ProductBrief, SearchPlan, TargetMarket
+
+logger = logging.getLogger("backend.agents.planner")
+
+SYSTEM_PROMPT_TEMPLATE = """You are an e-commerce market analyst for Indian fashion marketplaces.
+Given a T-shirt brief, infer the target market and produce search queries
+that a real Indian shopper would type on Amazon.in, Myntra, Flipkart and Meesho.
+Rules:
+- Queries must be 2-6 words, lowercase, realistic shopper language (include Hinglish only if natural).
+- Max {MAX_QUERIES_PER_PLATFORM} queries per requested platform, no duplicates, mix: 1 broad, 2 specific (type+color / fit), 1-2 long-tail (occasion/design).
+- Max 5 social queries (for Reddit/X/Instagram discussions and hashtags).
+- seed_keywords: 10-20 core terms from the brief.
+- Do not invent facts about the product. Do not use brand/celebrity names unless given in the brief.
+
+Return ONLY a valid JSON object matching this exact structure:
+{{
+  "target_market": {{
+    "age_range": "18-35",
+    "personas": ["College Students", "Urban Shoppers"],
+    "interests": ["Streetwear", "Graphic Tees"],
+    "regions": ["Pan-India", "Metro Cities"],
+    "language_notes": "Shopper terms"
+  }},
+  "marketplace_queries": {{
+    "amazon": ["..."],
+    "flipkart": ["..."],
+    "myntra": ["..."],
+    "meesho": ["..."]
+  }},
+  "social_queries": ["..."],
+  "seed_keywords": ["..."]
+}}"""
+
+
+class PlannerAgent:
+    """Agent 1: Incurs at most 1 LLM call to generate search queries and target market."""
+
+    def __init__(self, llm_client: OpenRouterClient):
+        self.llm = llm_client
+
+    def _build_deterministic_fallback(self, brief: ProductBrief) -> SearchPlan:
+        """Deterministic fallback search plan when quota is out or LLM fails."""
+        settings = get_settings()
+        target = TargetMarket(
+            age_range="18-30",
+            personas=["College Students", "Young Working Professionals", "Streetwear Enthusiasts"],
+            interests=["Casual fashion", "Streetwear", "Comfort wear", "Minimalist aesthetic"],
+            regions=["Metro & Tier-1/2 Indian Cities"],
+            language_notes="Shoppers use terms like 'cotton oversized tee', 'baggy t shirt', 'loose fit round neck'.",
+        )
+
+        t_type = brief.tshirt_type.lower()
+        color = brief.color.lower()
+        gender = brief.gender.lower()
+
+        queries_map: dict[PlatformName, list[str]] = {}
+        for p in brief.platforms:
+            q_list = [
+                f"{color} {t_type}",
+                f"{gender} {color} {t_type}",
+                f"{t_type} for {gender}",
+                f"casual {color} {t_type}",
+                f"{color} {t_type} cotton",
+            ]
+            queries_map[p] = q_list[: settings.MAX_QUERIES_PER_PLATFORM]
+
+        social_q = [
+            f"{color} {t_type}",
+            f"{t_type} recommendation",
+            f"best {t_type} india",
+            f"where to buy {t_type}",
+        ]
+
+        seeds = [t_type, color, gender, "cotton", "t-shirt", "round neck", "casual", "oversized"]
+        return SearchPlan(
+            target_market=target,
+            marketplace_queries=queries_map,
+            social_queries=social_q[:5],
+            seed_keywords=seeds,
+        )
+
+    async def run(
+        self,
+        brief: ProductBrief,
+        emit: Callable[[str, str, str, dict | None], Coroutine[Any, Any, None]],
+        emit_node: Callable[[str, str, str | None, dict | None], Coroutine[Any, Any, None]] | None = None,
+    ) -> SearchPlan:
+        import time
+        start_t = time.time()
+        if emit_node:
+            await emit_node("planner", "running", "Analyzing brief and audience", None)
+
+        await emit("stage", "planner", "AI Planner analyzing brief and target market...", None)
+        settings = get_settings()
+
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            MAX_QUERIES_PER_PLATFORM=settings.MAX_QUERIES_PER_PLATFORM
+        )
+
+        user_prompt = f"Product Brief:\n{brief.model_dump_json(indent=2)}"
+
+        fallback_used = False
+        try:
+            plan: SearchPlan = await self.llm.chat(
+                role="planner", system=system_prompt, user=user_prompt, schema=SearchPlan
+            )
+            await emit(
+                "progress",
+                "planner",
+                "Search queries and target market generated successfully.",
+                None,
+            )
+        except Exception as e:
+            fallback_used = True
+            logger.warning(
+                f"Planner LLM failed or quota exceeded ({e}). Using deterministic fallback plan."
+            )
+            await emit("warning", "planner", f"Planner fallback active: {e}", None)
+            plan = self._build_deterministic_fallback(brief)
+
+        # Code-level sanitation: dedupe, lowercase, trim queries to MAX_QUERIES_PER_PLATFORM
+        sanitized_queries: dict[PlatformName, list[str]] = {}
+        fallback_consumer_queries = []
+        if plan.marketplace_queries:
+            fallback_consumer_queries = next(iter(plan.marketplace_queries.values()), [])
+
+        for p in brief.platforms:
+            raw_list = plan.marketplace_queries.get(p) or fallback_consumer_queries
+            clean_list = []
+            for q in raw_list:
+                norm_q = q.lower().strip()
+                if norm_q and norm_q not in clean_list:
+                    clean_list.append(norm_q)
+            if not clean_list:
+                clean_list = [f"{brief.color} {brief.tshirt_type}".lower()]
+            sanitized_queries[p] = clean_list[: settings.MAX_QUERIES_PER_PLATFORM]
+
+        clean_social = []
+        for sq in plan.social_queries:
+            norm_sq = sq.lower().strip()
+            if norm_sq and norm_sq not in clean_social:
+                clean_social.append(norm_sq)
+
+        plan.marketplace_queries = sanitized_queries
+        plan.social_queries = clean_social[:5]
+
+        duration_ms = round((time.time() - start_t) * 1000, 1)
+        if emit_node:
+            if fallback_used:
+                await emit_node("planner", "warning", "Fallback plan used", {"duration_ms": duration_ms})
+            else:
+                await emit_node(
+                    "planner",
+                    "success",
+                    "Generated queries and audience",
+                    {"duration_ms": duration_ms, "model": getattr(self.llm, "preferred_model", "openrouter")},
+                )
+
+            persona_summary = f"{plan.target_market.age_range}, {', '.join(plan.target_market.personas[:2])}"
+            total_q = sum(len(q) for q in plan.marketplace_queries.values())
+            await emit_node("target_market", "success", persona_summary, None)
+            await emit_node("search_queries", "success", f"{total_q} queries", {"queries": total_q})
+
+        return plan
+
+    _build_fallback_plan = _build_deterministic_fallback
