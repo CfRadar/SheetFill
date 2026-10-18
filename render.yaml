@@ -29,3 +29,5 @@ services:
         sync: false
       - key: FRONTEND_ORIGIN
         sync: false
+      - key: KEYWORD_AGENT_ENCRYPTION_KEY
+        sync: false

@@ -276,7 +276,9 @@ export async function downloadWorkbookFile(
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  window.URL.revokeObjectURL(blobUrl);
+  setTimeout(() => {
+    window.URL.revokeObjectURL(blobUrl);
+  }, 60000);
 }
 
 export async function getAllowedValues(attribute: string): Promise<string[]> {
