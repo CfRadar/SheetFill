@@ -129,3 +129,15 @@ export interface KeyStatus {
   preferred_model: string;
   last_verified_at: string | null;
 }
+
+export interface MultiKeyItem {
+  key_id: string;
+  label: string;
+  last4: string;
+  status: "active" | "degraded" | "invalid" | string;
+  usage_count: number;
+  last_used_at?: string | null;
+  last_error?: string | null;
+  created_at?: string | null;
+}
+

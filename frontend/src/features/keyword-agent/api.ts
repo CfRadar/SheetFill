@@ -1,7 +1,8 @@
 import { authFetch, API_BASE } from "../../api";
-import type { ChatResponse, KeyStatus, ProductBrief, RunResult, SSEEvent } from "./types";
+import type { ChatResponse, KeyStatus, MultiKeyItem, ProductBrief, RunResult, SSEEvent } from "./types";
 
 const KEYWORD_BASE = `${API_BASE}/api/keyword-agent`;
+
 
 export async function getKeyStatus(): Promise<KeyStatus> {
   const res = await authFetch(`${KEYWORD_BASE}/settings/openrouter-key`);
@@ -30,6 +31,37 @@ export async function deleteKey(): Promise<void> {
   });
   if (!res.ok) {
     throw new Error(`Failed to remove key: HTTP ${res.status}`);
+  }
+}
+
+export async function listUserKeys(): Promise<MultiKeyItem[]> {
+  const res = await authFetch(`${KEYWORD_BASE}/keys`);
+  if (!res.ok) {
+    throw new Error(`Failed to list keys: HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.keys || [];
+}
+
+export async function addUserKey(apiKey: string, label?: string): Promise<MultiKeyItem> {
+  const res = await authFetch(`${KEYWORD_BASE}/keys`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ api_key: apiKey, label: label || "Personal Key" }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail?.message || err?.message || "Failed to add API key.");
+  }
+  return res.json();
+}
+
+export async function deleteUserKey(keyId: string): Promise<void> {
+  const res = await authFetch(`${KEYWORD_BASE}/keys/${encodeURIComponent(keyId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete key: HTTP ${res.status}`);
   }
 }
 

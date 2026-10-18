@@ -33,8 +33,25 @@ class SessionState(BaseModel):
     report: Optional[Dict[str, Any]] = None
 
 
+_sync_client = None
+
+
+def _get_sync_db():
+    global _sync_client
+    try:
+        from app.config import settings
+        if not getattr(settings, "mongodb_uri", None):
+            return None
+        if _sync_client is None:
+            from pymongo import MongoClient
+            _sync_client = MongoClient(settings.mongodb_uri, serverSelectionTimeoutMS=2000)
+        return _sync_client[settings.mongodb_db]
+    except Exception:
+        return None
+
+
 class DesignStore:
-    """Manages session folders on disk in app/workspace/sessions/<uuid>/ scoped by user."""
+    """Manages session folders on disk in app/workspace/sessions/<uuid>/ backed by MongoDB."""
 
     def __init__(self, workspace_dir: Optional[str] = None):
         if not workspace_dir:
@@ -78,13 +95,35 @@ class DesignStore:
         return state
 
     def get_session(self, session_id: str, user_id: Optional[str] = None) -> Optional[SessionState]:
-        """Loads session state from disk. If user_id is provided, verifies ownership."""
+        """Loads session state from disk or MongoDB fallback. If user_id is provided, verifies ownership."""
         sdir = self._session_dir(session_id)
         state_file = sdir / "state.json"
-        if not state_file.exists():
+        data = None
+
+        if state_file.exists():
+            try:
+                with open(state_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = None
+
+        if not data:
+            # Dual-read fallback to MongoDB workspace_sessions collection
+            sync_db = _get_sync_db()
+            if sync_db is not None:
+                try:
+                    doc = sync_db.workspace_sessions.find_one({"session_id": session_id})
+                    if doc and "data" in doc:
+                        data = doc["data"]
+                        sdir.mkdir(parents=True, exist_ok=True)
+                        with open(state_file, "w", encoding="utf-8") as f:
+                            json.dump(data, f, indent=2)
+                except Exception:
+                    pass
+
+        if not data:
             return None
-        with open(state_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+
         state = SessionState.model_validate(data)
         if user_id is not None and state.user_id is not None:
             if str(state.user_id) != str(user_id):
@@ -92,13 +131,33 @@ class DesignStore:
         return state
 
     def save_session(self, state: SessionState) -> None:
-        """Persists session state to disk."""
+        """Persists session state to disk and MongoDB workspace_sessions collection."""
         sdir = self._session_dir(state.session_id)
         sdir.mkdir(parents=True, exist_ok=True)
         state.updated_at = time.time()
         state_file = sdir / "state.json"
+        serialized = state.model_dump_json(indent=2)
         with open(state_file, "w", encoding="utf-8") as f:
-            f.write(state.model_dump_json(indent=2))
+            f.write(serialized)
+
+        # Dual-write persistence to MongoDB
+        sync_db = _get_sync_db()
+        if sync_db is not None:
+            try:
+                sync_db.workspace_sessions.update_one(
+                    {"session_id": state.session_id},
+                    {
+                        "$set": {
+                            "session_id": state.session_id,
+                            "user_id": state.user_id,
+                            "data": json.loads(serialized),
+                            "updated_at": state.updated_at,
+                        }
+                    },
+                    upsert=True,
+                )
+            except Exception:
+                pass
 
     def update_summary(self, state: SessionState) -> None:
         """Recalculates summary counts on the session."""

@@ -15,8 +15,12 @@ from app.config import settings
 from app.db import get_db, is_db_connected
 from app.keyword_agent.events import event_manager
 from app.keyword_agent.key_store import (
+    add_user_key,
     delete_user_key,
     get_user_key_status,
+    list_user_keys,
+    remove_user_key,
+    resolve_all_active_keys,
     resolve_user_openrouter_key,
     save_user_key,
     test_openrouter_key,
@@ -60,6 +64,26 @@ class KeyStatusResponse(BaseModel):
     last4: Optional[str] = None
     preferred_model: str
     last_verified_at: Optional[str] = None
+
+
+class MultiKeyAddRequest(BaseModel):
+    api_key: str = Field(..., min_length=20, max_length=256)
+    label: str = Field("Key", max_length=64)
+
+
+class MultiKeySummary(BaseModel):
+    key_id: str
+    label: str
+    last4: str
+    status: str
+    usage_count: int = 0
+    last_used_at: Optional[Any] = None
+    last_error: Optional[str] = None
+    created_at: Optional[Any] = None
+
+
+class MultiKeyListResponse(BaseModel):
+    keys: list[MultiKeySummary]
 
 
 class CreateRunResponse(BaseModel):
@@ -166,6 +190,38 @@ async def test_key(
         )
 
 
+@router.get("/keys", response_model=MultiKeyListResponse)
+async def get_keys(user: CurrentUser = Depends(require_user)) -> MultiKeyListResponse:
+    """Returns all configured keys in the user's multi-key vault."""
+    keys = await list_user_keys(user.id)
+    return MultiKeyListResponse(keys=[MultiKeySummary(**k) for k in keys])
+
+
+@router.post("/keys")
+async def create_vault_key(
+    req: MultiKeyAddRequest,
+    user: CurrentUser = Depends(require_user),
+) -> Dict[str, Any]:
+    """Adds a validated OpenRouter key to the user's multi-key vault."""
+    try:
+        return await add_user_key(user.id, plain_key=req.api_key, label=req.label, verify_live=True)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_KEY", "message": str(e)})
+    except Exception as e:
+        logger.exception(f"Failed to add key to vault for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail={"code": "KEY_STORAGE_ERROR", "message": str(e)})
+
+
+@router.delete("/keys/{key_id}")
+async def delete_vault_key(
+    key_id: str,
+    user: CurrentUser = Depends(require_user),
+) -> Dict[str, Any]:
+    """Deletes a key from the user's vault."""
+    removed = await remove_user_key(user.id, key_id)
+    return {"status": "ok", "deleted": removed}
+
+
 @router.get("/models")
 async def list_models(user: CurrentUser = Depends(require_user)) -> Dict[str, Any]:
     """Returns catalog of supported free and paid models."""
@@ -222,8 +278,15 @@ async def create_run(
             upsert=True,
         )
 
-    # 4. Create BYOK client and orchestrator
-    llm_client = OpenRouterClient(api_key=plain_key, preferred_model=preferred_model)
+    # 4. Create BYOK client with multi-key failover and orchestrator
+    active_keys_tuples = await resolve_all_active_keys(user.id)
+    all_keys = [k[0] for k in active_keys_tuples] if active_keys_tuples else ([plain_key] if plain_key else [])
+    llm_client = OpenRouterClient(
+        api_key=plain_key or (all_keys[0] if all_keys else ""),
+        preferred_model=preferred_model,
+        api_keys=all_keys,
+        user_id=user.id,
+    )
     orchestrator = WorkflowOrchestrator(llm_client=llm_client)
 
     # 5. Define background task with slot release guarantee

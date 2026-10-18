@@ -92,8 +92,7 @@ class MarketplaceScraperAgent:
         total_queries = len(adapted_queries)
 
         for idx, q in enumerate(adapted_queries, 1):
-            norm_q = normalize_text(q).replace(" ", "_")
-            cache_key = f"scrape:{platform}:{norm_q}"
+            cache_key = cache.make_cache_key("scrape", platform, q)
 
             # 1. Check Cache
             cached_data = await cache.get(cache_key)
@@ -225,9 +224,20 @@ class MarketplaceScraperAgent:
                 seen_titles.add(norm_title)
                 deduped_products.append(p)
 
-        # Sort products rating-wise (highest rating, then review count)
+        # Sort products rating-wise with Bayesian weighted score:
+        # W = (v / (v + m)) * R + (m / (v + m)) * C
+        def _score_product(p: ScrapedProduct) -> float:
+            r = float(p.rating) if p.rating is not None and p.rating > 0 else 0.0
+            v = int(p.rating_count) if p.rating_count is not None and p.rating_count > 0 else 0
+            if r <= 0.0 and v <= 0:
+                return 0.0
+            m = 10.0
+            c = 4.0
+            return (v / (v + m)) * r + (m / (v + m)) * c
+
         deduped_products.sort(
             key=lambda p: (
+                _score_product(p),
                 p.rating if p.rating is not None else 0.0,
                 p.rating_count if p.rating_count is not None else 0,
             ),

@@ -1,5 +1,6 @@
 """API router implementing all endpoints specified in Section 6."""
 
+import asyncio
 from datetime import datetime
 import json
 import os
@@ -69,11 +70,20 @@ async def analyze_sheet(
     file: UploadFile = File(...),
     user: CurrentUser = Depends(require_user),
 ) -> Any:
-    # 25 MB max limit
-    MAX_BYTES = 25 * 1024 * 1024
-    contents = await file.read()
-    if len(contents) > MAX_BYTES:
-        return _json_error(413, "FILE_TOO_LARGE", f"File size exceeds 25 MB limit ({len(contents)} bytes)")
+    # 25 MB max limit enforced via 1 MB chunked streaming to prevent memory exhaustion
+    CHUNK_SIZE = 1024 * 1024  # 1 MB
+    MAX_BYTES = 25 * 1024 * 1024  # 25 MB
+    chunks = []
+    total_size = 0
+    while True:
+        chunk = await file.read(CHUNK_SIZE)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > MAX_BYTES:
+            return _json_error(413, "FILE_TOO_LARGE", f"File size exceeds 25 MB limit")
+        chunks.append(chunk)
+    contents = b"".join(chunks)
 
     filename = file.filename or "upload.xlsm"
     ext = Path(filename).suffix.lower()
@@ -773,15 +783,16 @@ async def generate_workbook(
     if not ready_rows_map and not any(d.status == "complete" for d in session.designs):
         return _json_error(400, "NO_READY_DESIGNS", "At least one design must be ready to generate.")
 
-    # Generate workbook with same base name in .xls format
+    # Generate workbook with base name in macro-enabled .xlsm format
     sdir = store._session_dir(sid)
-    orig_name = session.original_filename or "sheet.xls"
+    orig_name = session.original_filename or "sheet.xlsm"
     base_name = Path(orig_name).stem
-    out_filename = f"{base_name}.xls"
+    out_filename = f"{base_name}.xlsm"
     out_path = sdir / out_filename
 
     try:
-        out_file, report = rebuild_tshirt_workbook(
+        out_file, report = await asyncio.to_thread(
+            rebuild_tshirt_workbook,
             master_template_path=_get_master_template_path(),
             output_path=str(out_path),
             designs=session.designs,
@@ -822,6 +833,16 @@ async def download_workbook(
 
     sdir = store._session_dir(sid)
     fpath = sdir / session.output_filename
+    # Fallback to alternate extension if renamed
+    if not fpath.exists():
+        alt_path = sdir / f"{Path(session.output_filename).stem}.xlsm"
+        if alt_path.exists():
+            fpath = alt_path
+        else:
+            alt_xls = sdir / f"{Path(session.output_filename).stem}.xls"
+            if alt_xls.exists():
+                fpath = alt_xls
+
     if not fpath.exists():
         return _json_error(404, "FILE_NOT_FOUND", f"File '{session.output_filename}' not found on disk.")
 
@@ -830,18 +851,25 @@ async def download_workbook(
         user=user,
         request=request,
         session_id=sid,
-        meta={"filename": session.output_filename},
+        meta={"filename": fpath.name},
     )
 
     headers = {
         "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
         "Pragma": "no-cache",
         "Expires": "0",
+        "Content-Disposition": f'attachment; filename="{fpath.name}"',
     }
+
+    media_type = (
+        "application/vnd.ms-excel.sheet.macroEnabled.12"
+        if fpath.suffix.lower() == ".xlsm"
+        else "application/vnd.ms-excel"
+    )
 
     return FileResponse(
         path=str(fpath),
-        filename=session.output_filename,
-        media_type="application/vnd.ms-excel",
+        filename=fpath.name,
+        media_type=media_type,
         headers=headers,
     )

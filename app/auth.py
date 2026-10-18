@@ -223,7 +223,7 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
 
         uid = str(admin_doc["_id"])
         sid = str(uuid.uuid4())
-        session_exp = now + timedelta(hours=2)
+        session_exp = now + timedelta(minutes=15)
 
         session_doc = {
             "session_id": sid,
@@ -262,13 +262,25 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
             },
         )
 
+        # Ephemeral session cookies for admin (no max_age/expires)
+        response.set_cookie(
+            key="sheetfill_token",
+            value=token,
+            httponly=True,
+            samesite="lax",
+            secure=settings.env == "production",
+            max_age=None,
+            expires=None,
+            path="/",
+        )
         response.set_cookie(
             key="access_token",
             value=token,
             httponly=True,
             samesite="lax",
             secure=settings.env == "production",
-            max_age=7200,
+            max_age=None,
+            expires=None,
             path="/",
         )
 
@@ -380,7 +392,8 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
         )
         invalidate_user_sessions(uid)
 
-    max_token_exp = now + timedelta(minutes=settings.access_token_minutes)
+    user_persistent_duration = timedelta(days=7)
+    max_token_exp = now + user_persistent_duration
     if access_exp and access_exp < max_token_exp:
         session_exp = access_exp
     else:
@@ -427,13 +440,24 @@ async def login(req: LoginRequest, request: Request, response: Response) -> Logi
         expires_at=session_exp,
     )
 
+    cookie_max_age = int((session_exp - now).total_seconds())
+    response.set_cookie(
+        key="sheetfill_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.env == "production",
+        max_age=cookie_max_age,
+        path="/",
+    )
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
         samesite="lax",
         secure=settings.env == "production",
-        max_age=int((session_exp - now).total_seconds()),
+        max_age=cookie_max_age,
+        path="/",
     )
 
     days_left = None
@@ -492,7 +516,8 @@ async def logout(
                 session_id=sid,
             )
 
-    response.delete_cookie(key="access_token")
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="sheetfill_token", path="/")
     return {"status": "ok", "message": "Successfully logged out."}
 
 
@@ -507,7 +532,7 @@ def _extract_token(request: Request, authorization: Optional[str]) -> Optional[s
     token_param = request.query_params.get("token")
     if token_param:
         return token_param.strip()
-    return request.cookies.get("access_token")
+    return request.cookies.get("sheetfill_token") or request.cookies.get("access_token")
 
 
 async def _get_current_authenticated_user(
@@ -683,13 +708,28 @@ async def require_user(
 async def require_admin(
     user: CurrentUser = Depends(_get_current_authenticated_user),
 ) -> CurrentUser:
-    """Dependency verifying the caller is authenticated as an admin."""
+    """Dependency verifying the caller is authenticated as an admin with 15-minute idle timeout."""
     if user.role != "admin":
         raise _auth_error(
             status.HTTP_403_FORBIDDEN,
             "FORBIDDEN",
             "Administrative privileges are required for this endpoint.",
         )
+    # Strict 15-minute idle timeout check for admin sessions
+    now = datetime.now(timezone.utc)
+    cached = get_cached_session(user.session_id)
+    if cached:
+        last_seen = cached.get("last_seen_update") or cached.get("created_at")
+        if last_seen:
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            if (now - last_seen).total_seconds() > 900:  # 15 minutes
+                invalidate_session(user.session_id)
+                raise _auth_error(
+                    status.HTTP_401_UNAUTHORIZED,
+                    "SESSION_EXPIRED",
+                    "Admin session timed out after 15 minutes of inactivity. Please sign in again.",
+                )
     return user
 
 
