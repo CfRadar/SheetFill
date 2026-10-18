@@ -195,7 +195,54 @@ class FlipkartAdapter(BaseSourceAdapter):
         return items
 
     async def suggest(self, query: str, ctx: Any = None) -> list[str]:
+        encoded = urllib.parse.quote_plus(query)
+        url = f"https://www.flipkart.com/api/6/search/autosuggest?q={encoded}"
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+        }
+        try:
+            from app.keyword_agent.security import SafeAsyncClient
+            async with SafeAsyncClient(timeout=6.0) as client:
+                resp = await client.get(url, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    suggs: list[str] = []
+                    if isinstance(data, dict):
+                        resp_obj = data.get("RESPONSE", {})
+                        sq = resp_obj.get("suggestedQueries", [])
+                        for item in sq:
+                            q_text = item.get("query") if isinstance(item, dict) else str(item)
+                            if q_text and q_text not in suggs:
+                                suggs.append(q_text.strip())
+                    return suggs[:10]
+        except Exception as e:
+            logger.debug(f"Flipkart autosuggest failed: {e}")
         return []
+
+    async def _fetch_html_http(self, url: str) -> str:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-IN,en;q=0.9",
+        }
+        try:
+            from app.keyword_agent.security import SafeAsyncClient
+            async with SafeAsyncClient(timeout=10.0) as client:
+                resp = await client.get(url, headers=headers)
+                if resp.status_code == 200:
+                    return resp.text
+        except Exception as err:
+            logger.debug(f"Flipkart HTTP fetch failed: {err}")
+        return ""
 
     async def search(self, query: str, ctx: Any = None) -> SourceResult:
         start_time = time.time()
@@ -203,53 +250,72 @@ class FlipkartAdapter(BaseSourceAdapter):
         settings = get_settings()
         browser_mgr = ctx if isinstance(ctx, BrowserManager) else BrowserManager.get_instance()
 
+        suggestions = await self.suggest(query)
         encoded = urllib.parse.quote_plus(query)
         url = f"https://www.flipkart.com/search?q={encoded}&sort=popularity"
 
-        page = None
-        try:
-            context = await browser_mgr.get_context("flipkart")
-            page = await context.new_page()
-            is_blocked, content = await browser_mgr.polite_goto(page, url, "flipkart", spec=spec)
-            duration_ms = int((time.time() - start_time) * 1000)
+        content = ""
+        strategy_used = "dom_selectors"
 
-            if is_blocked:
-                return SourceResult(
-                    source_id="flipkart",
-                    status="blocked",
-                    cause="blocked",
-                    duration_ms=duration_ms,
-                    note="Flipkart robot check triggered.",
-                )
+        if browser_mgr.is_available():
+            page = None
+            try:
+                context = await browser_mgr.get_context("flipkart")
+                page = await context.new_page()
+                is_blocked, page_content = await browser_mgr.polite_goto(page, url, "flipkart", spec=spec)
+                if not is_blocked and page_content:
+                    content = page_content
+                    strategy_used = "browser"
+            except Exception as e:
+                logger.debug(f"Flipkart browser query skipped ({e}), using HTTP fallback.")
+            finally:
+                if page:
+                    try:
+                        await page.close()
+                    except Exception:
+                        pass
 
-            items = self.parse(content)[: settings.MAX_PRODUCTS_PER_QUERY]
-            status = "ok" if len(items) >= 3 else ("partial" if items else "error")
-            cause = None if status == "ok" else ("selector_drift" if not items else None)
+        # Direct HTTP fallback
+        if not content:
+            content = await self._fetch_html_http(url)
+            strategy_used = "http_html"
 
+        duration_ms = int((time.time() - start_time) * 1000)
+
+        if not content:
             return SourceResult(
                 source_id="flipkart",
-                status=status,
-                strategy_used="dom_selectors" if items else None,
-                cause=cause,
-                items=items,
+                status="partial" if suggestions else "error",
+                strategy_used=strategy_used,
+                suggestions=suggestions,
+                items=[],
                 duration_ms=duration_ms,
+                note="Flipkart search response empty.",
             )
-        except Exception as e:
-            duration_ms = int((time.time() - start_time) * 1000)
-            logger.warning(f"Flipkart search failed: {e}")
-            return SourceResult(
-                source_id="flipkart",
-                status="error",
-                cause="timing",
-                duration_ms=duration_ms,
-                note=str(e),
-            )
-        finally:
-            if page:
-                try:
-                    await page.close()
-                except Exception:
-                    pass
+
+        items = self.parse(content)
+
+        # Sort items rating-wise (highest rating, then highest review count)
+        def item_rating_key(it: Item):
+            r = it.rating if it.rating is not None else 0.0
+            rc = it.rating_count if it.rating_count is not None else 0
+            return (r, rc)
+
+        items.sort(key=item_rating_key, reverse=True)
+        items = items[: settings.MAX_PRODUCTS_PER_QUERY]
+        for idx, it in enumerate(items, start=1):
+            it.position = idx
+
+        status = "ok" if len(items) >= 2 else ("partial" if (items or suggestions) else "error")
+
+        return SourceResult(
+            source_id="flipkart",
+            status=status,
+            strategy_used=strategy_used if items else None,
+            items=items,
+            suggestions=suggestions,
+            duration_ms=duration_ms,
+        )
 
 
 parse_search_html = FlipkartAdapter().parse

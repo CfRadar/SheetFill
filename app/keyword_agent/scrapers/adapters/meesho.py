@@ -252,67 +252,92 @@ class MeeshoAdapter(BaseSourceAdapter):
                 except Exception:
                     pass
 
-        try:
-            async with bm.page(
-                source_id="meesho",
-                block_images=spec.block_images if spec else False,
-                response_listener=response_interceptor,
-            ) as page:
-                await page.goto(search_url, wait_until="domcontentloaded", timeout=12000)
+        content = ""
+        strategy = "dom_selectors"
 
-                # Dismiss app banner / login prompt if present
-                for dismiss_sel in [
-                    "button:has-text('✕')",
-                    "div[class*='Modal'] button",
-                    "button:has-text('Close')",
-                    "span:has-text('Continue on Web')",
-                ]:
-                    try:
-                        btn = page.locator(dismiss_sel).first
-                        if await btn.is_visible(timeout=1000):
-                            await btn.click()
-                    except Exception:
-                        pass
+        if bm.is_available():
+            try:
+                async with bm.page(
+                    source_id="meesho",
+                    block_images=spec.block_images if spec else False,
+                    response_listener=response_interceptor,
+                ) as page:
+                    await page.goto(search_url, wait_until="domcontentloaded", timeout=12000)
 
-                # Scroll down 2 steps
-                await bm.step_scroll(page, steps=2, pause_ms=400)
-                html = await page.content()
+                    # Dismiss app banner / login prompt if present
+                    for dismiss_sel in [
+                        "button:has-text('✕')",
+                        "div[class*='Modal'] button",
+                        "button:has-text('Close')",
+                        "span:has-text('Continue on Web')",
+                    ]:
+                        try:
+                            btn = page.locator(dismiss_sel).first
+                            if await btn.is_visible(timeout=1000):
+                                await btn.click()
+                        except Exception:
+                            pass
 
-            # Check network capture first
-            if captured_payloads:
-                items = self.parse(captured_payloads)
-                if items:
-                    dur = int(round((time.time() - start_t) * 1000))
-                    return SourceResult(
-                        source_id="meesho",
-                        status="ok",
-                        strategy_used="network_capture",
-                        items=items,
-                        duration_ms=dur,
-                    )
+                    # Scroll down 2 steps
+                    await bm.step_scroll(page, steps=2, pause_ms=400)
+                    content = await page.content()
+                    strategy = "browser"
+            except Exception as e:
+                logger.debug(f"Meesho browser query skipped ({e}), using HTTP fallback.")
 
-            # Fallback to HTML parser
-            items = self.parse(html)
-            dur = int(round((time.time() - start_t) * 1000))
-            status = "ok" if items else "blocked"
-            return SourceResult(
-                source_id="meesho",
-                status=status,
-                strategy_used="dom_selectors" if items else "none",
-                items=items,
-                duration_ms=dur,
-                error="No items extracted from Meesho search page" if not items else None,
-            )
-        except Exception as exc:
-            dur = int(round((time.time() - start_t) * 1000))
-            logger.warning(f"Meesho fetch failed: {exc}")
-            return SourceResult(
-                source_id="meesho",
-                status="blocked" if "block" in str(exc).lower() else "error",
-                strategy_used="none",
-                items=[],
-                duration_ms=dur,
-                error=str(exc),
-            )
+        # HTTP fallback
+        if not content and not captured_payloads:
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-IN,en;q=0.9",
+            }
+            try:
+                from app.keyword_agent.security import SafeAsyncClient
+                async with SafeAsyncClient(timeout=10.0) as client:
+                    resp = await client.get(search_url, headers=headers)
+                    if resp.status_code == 200:
+                        content = resp.text
+                        strategy = "http_html"
+            except Exception as err:
+                logger.debug(f"Meesho HTTP fetch failed: {err}")
+
+        # Check network capture first
+        items: list[Item] = []
+        if captured_payloads:
+            items = self.parse(captured_payloads)
+            if items:
+                strategy = "network_capture"
+
+        # Fallback to HTML parser
+        if not items and content:
+            items = self.parse(content)
+
+        dur = int(round((time.time() - start_t) * 1000))
+
+        # Sort items rating-wise (highest rating, then highest review count)
+        def item_rating_key(it: Item):
+            r = it.rating if it.rating is not None else 0.0
+            rc = it.rating_count if it.rating_count is not None else 0
+            return (r, rc)
+
+        items.sort(key=item_rating_key, reverse=True)
+        items = items[: settings.MAX_PRODUCTS_PER_QUERY]
+        for idx, it in enumerate(items, start=1):
+            it.position = idx
+
+        status = "ok" if len(items) >= 2 else ("partial" if items else "error")
+        return SourceResult(
+            source_id="meesho",
+            status=status,
+            strategy_used=strategy if items else "none",
+            items=items,
+            duration_ms=dur,
+            error="No items extracted from Meesho search page" if not items else None,
+        )
 
     fetch = search

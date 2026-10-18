@@ -63,12 +63,26 @@ class BrowserManager:
         self._lock = asyncio.Lock()
         self._context_semaphore = asyncio.Semaphore(3)  # Global max 3 concurrent contexts
         self._domain_locks: dict[str, asyncio.Lock] = {}
+        self._playwright_unavailable: bool = False
 
     @classmethod
     def get_instance(cls) -> "BrowserManager":
         if cls._instance is None:
             cls._instance = BrowserManager()
         return cls._instance
+
+    def is_available(self) -> bool:
+        if self._playwright_unavailable:
+            return False
+        if sys.platform == "win32":
+            try:
+                loop = asyncio.get_running_loop()
+                proactor_cls = getattr(asyncio, "ProactorEventLoop", None)
+                if proactor_cls and not isinstance(loop, proactor_cls):
+                    return False
+            except RuntimeError:
+                pass
+        return True
 
     def get_domain_lock(self, domain: str) -> asyncio.Lock:
         clean_domain = domain.lower().strip()
@@ -77,13 +91,19 @@ class BrowserManager:
         return self._domain_locks[clean_domain]
 
     async def _ensure_browser(self) -> Browser:
+        if not self.is_available():
+            raise RuntimeError("Playwright unavailable on this system/event-loop: Proactor event loop required on Windows.")
+
         if self._browser is None:
             async with self._lock:
+                if not self.is_available():
+                    raise RuntimeError("Playwright unavailable on this system/event-loop.")
                 if self._browser is None:
                     logger.info("Launching Playwright Chromium headless...")
                     try:
                         self._playwright = await async_playwright().start()
                     except (NotImplementedError, Exception) as e:
+                        self._playwright_unavailable = True
                         logger.warning(f"Playwright driver could not be started ({e}). Falling back to HTTP/JSON scrapers.")
                         raise RuntimeError(f"Playwright unavailable on this system/event-loop: {e}")
                     browser_args = [

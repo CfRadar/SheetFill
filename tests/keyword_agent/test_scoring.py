@@ -86,3 +86,47 @@ def test_score_all_platforms():
     assert "flipkart" in results
     assert len(results["amazon"]) > 0
     assert len(results["flipkart"]) > 0
+
+
+def test_rating_wise_sorting_and_scoring():
+    brief = ProductBrief(tshirt_type="Graphic Tee", color="Black", gender="unisex")
+    p1 = ScrapedProduct(
+        platform="amazon",
+        position=2,
+        title="Anime Black Graphic Tee Premium Cotton",
+        rating=4.8,
+        rating_count=3500,
+        url="https://amazon.in/1",
+    )
+    p2 = ScrapedProduct(
+        platform="amazon",
+        position=1,
+        title="Cheap Black Print T-Shirt Polyester",
+        rating=3.1,
+        rating_count=50,
+        url="https://amazon.in/2",
+    )
+    # Re-sort rating-wise
+    sorted_prods = sorted(
+        [p2, p1],
+        key=lambda p: (p.rating if p.rating is not None else 0.0, p.rating_count if p.rating_count is not None else 0),
+        reverse=True,
+    )
+    for idx, p in enumerate(sorted_prods, start=1):
+        p.position = idx
+
+    assert sorted_prods[0].title == p1.title
+    assert sorted_prods[0].position == 1
+    assert sorted_prods[1].position == 2
+
+    scrape = PlatformScrape(
+        platform="amazon",
+        status="ok",
+        products=sorted_prods,
+        suggestions=["anime black graphic tee"],
+    )
+    scored = score_platform(platform="amazon", scrape=scrape, social=None, brief=brief)
+    top_cands = [c[0] for c in scored[:5]]
+    # High-rating product keyword should rank higher
+    assert any("anime" in c or "graphic" in c for c in top_cands)
+

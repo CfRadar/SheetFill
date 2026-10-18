@@ -152,6 +152,8 @@ class OpenRouterClient:
     ):
         self.api_key = api_key.strip()
         pref = (preferred_model or settings.keyword_agent_default_model).strip()
+        if pref.endswith(":free"):
+            pref = pref[:-5]
         self.preferred_model = pref
         self.timeout_seconds = timeout_seconds
         self.llm_calls_used: int = 0
@@ -161,10 +163,6 @@ class OpenRouterClient:
         chain = []
         if self.preferred_model:
             chain.append(self.preferred_model)
-            if self.preferred_model.endswith(":free"):
-                paid_slug = self.preferred_model[:-5]
-                if paid_slug not in chain:
-                    chain.append(paid_slug)
         for m in self.DEFAULT_FREE_MODELS:
             if m not in chain:
                 chain.append(m)

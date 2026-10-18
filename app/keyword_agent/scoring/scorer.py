@@ -180,7 +180,8 @@ def score_platform(
             if c in p.title.lower():
                 pos = max(1, p.position)
                 revs = max(0, p.rating_count or 0)
-                review_score += (1.0 / math.sqrt(pos)) * math.log1p(revs)
+                rating_mult = (p.rating / 5.0) if (p.rating and p.rating > 0) else 0.7
+                review_score += (1.0 / math.sqrt(pos)) * math.log1p(revs) * rating_mult
                 if p.brand:
                     suppliers_for_c.add(p.brand.lower())
 

@@ -20,6 +20,7 @@ ALLOWLISTED_HOSTS = {
     "flipkart.com",
     "www.flipkart.com",
     "meesho.com",
+    "www.meesho.com",
     "reddit.com",
     "www.reddit.com",
     "openrouter.ai",

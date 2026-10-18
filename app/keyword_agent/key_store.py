@@ -160,10 +160,14 @@ async def get_user_key_status(user_id: str) -> Dict[str, Any]:
         last_verified.isoformat() if isinstance(last_verified, datetime) else str(last_verified or "")
     )
 
+    model = doc.get("preferred_model") or settings.keyword_agent_default_model
+    if model and model.endswith(":free"):
+        model = model[:-5]
+
     return {
         "configured": True,
         "last4": doc.get("key_last4", "****"),
-        "preferred_model": doc.get("preferred_model") or settings.keyword_agent_default_model,
+        "preferred_model": model,
         "last_verified_at": last_verified_iso or None,
     }
 
@@ -192,4 +196,16 @@ async def resolve_user_openrouter_key(user_id: str) -> tuple[Optional[str], Opti
         return None, None
 
     plain_key = decrypt_key(doc["encrypted_key"])
-    return plain_key, doc.get("preferred_model")
+    model = doc.get("preferred_model") or settings.keyword_agent_default_model
+    if model and model.endswith(":free"):
+        model = model[:-5]
+        # Silently persist migrated slug to MongoDB
+        try:
+            await db.keyword_agent_user_keys.update_one(
+                {"user_id": u_obj_id},
+                {"$set": {"preferred_model": model, "updated_at": datetime.now(timezone.utc)}},
+            )
+        except Exception:
+            pass
+
+    return plain_key, model

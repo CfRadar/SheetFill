@@ -223,8 +223,18 @@ class MarketplaceScraperAgent:
             norm_title = p.title.lower().strip()
             if norm_title not in seen_titles:
                 seen_titles.add(norm_title)
-                p.position = len(deduped_products) + 1
                 deduped_products.append(p)
+
+        # Sort products rating-wise (highest rating, then review count)
+        deduped_products.sort(
+            key=lambda p: (
+                p.rating if p.rating is not None else 0.0,
+                p.rating_count if p.rating_count is not None else 0,
+            ),
+            reverse=True,
+        )
+        for idx, p in enumerate(deduped_products, start=1):
+            p.position = idx
 
         clean_sugg = list(dict.fromkeys(all_suggestions))
         clean_rel = list(dict.fromkeys(all_related))
