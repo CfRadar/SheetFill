@@ -3,7 +3,9 @@ import { Button } from "@heroui/react";
 import { Check, FileText } from "lucide-react";
 import { toast } from "../ui/ToastProvider";
 
-export const FLIPKART_TSHIRT_PROMPT = `You are a Flipkart catalog specialist. I have uploaded 6 images of ONE oversized black women's T-shirt design. Return ONLY a valid JSON object (no markdown fences, no explanation) that follows the EXAMPLE below exactly in structure, length and writing style.
+export const FLIPKART_TSHIRT_PROMPT = `You are a Flipkart catalog specialist. I have uploaded ONE reference image of a T-shirt design. Analyze the reference image carefully and take EVERYTHING directly from it. Identify the actual product type, garment color, gender, fit, sleeve length, artwork, graphics, characters, typography, colors, design placement, theme, aesthetic, and every other visible detail from the image itself. Do not assume the product is always a black oversized women's T-shirt. The product description and listing must adapt entirely to what is actually shown in the reference image.
+
+Return ONLY a valid JSON object (no Markdown fences, no explanation) that follows the EXAMPLE below exactly in structure, length, and writing style. Use the reference image as the primary source of truth for every field. Preserve the design's distinctive visual identity and accurately describe its details. Generate a relevant, SEO-friendly product title and listing suitable for Flipkart, while following marketplace listing guidelines. Do not invent features, colors, characters, materials, or other details that are not supported by the reference image. Do not include brand or celebrity names, or copyrighted character names, in the listing.
 
 HARD LENGTH LIMITS (do not exceed)
 - product_title: 5-7 words, max 45 characters. Generic, with no design name. Always: "Women’s Premium Oversized Printed T-Shirt"
