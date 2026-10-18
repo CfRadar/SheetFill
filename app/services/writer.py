@@ -224,7 +224,11 @@ def _clear_and_patch_sheet_xml(
                 is_el = ET.SubElement(c_elem, f"{{{MAIN_NS}}}is")
                 t_el = ET.SubElement(is_el, f"{{{MAIN_NS}}}t")
                 t_el.attrib["{http://www.w3.org/XML/1998/namespace}space"] = "preserve"
-                t_el.text = str(val)
+                str_val = str(val)
+                # Excel formula injection defense: neutralize =, +, -, @
+                if str_val and str_val[0] in ("=", "+", "-", "@"):
+                    str_val = "'" + str_val
+                t_el.text = str_val
 
         # Sort cells in column index order
         cells_sorted = sorted(

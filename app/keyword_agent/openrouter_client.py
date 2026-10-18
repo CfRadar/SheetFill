@@ -149,8 +149,12 @@ class OpenRouterClient:
         api_key: str,
         preferred_model: Optional[str] = None,
         timeout_seconds: float = 90.0,
+        api_keys: Optional[list[str]] = None,
+        user_id: Optional[str] = None,
     ):
-        self.api_key = api_key.strip()
+        self.api_keys = [k.strip() for k in api_keys] if api_keys else [api_key.strip()]
+        self.api_key = self.api_keys[0] if self.api_keys else api_key.strip()
+        self.user_id = user_id
         pref = (preferred_model or settings.keyword_agent_default_model).strip()
         if pref.endswith(":free"):
             pref = pref[:-5]
@@ -175,70 +179,91 @@ class OpenRouterClient:
         temperature: float = 0.2,
         max_tokens: int = 2000,
     ) -> str:
-        """Sends chat completion with automatic model fallbacks and error mapping."""
+        """Sends chat completion with automatic model fallbacks and multi-key failover."""
         models = self.get_models_for_role(role)
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "HTTP-Referer": settings.frontend_origin,
-            "X-Title": "Marketplace Keyword Agent",
-            "Content-Type": "application/json",
-        }
-
         last_error = None
-        for model in models:
-            payload = {
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
+
+        for key_idx, current_key in enumerate(self.api_keys):
+            headers = {
+                "Authorization": f"Bearer {current_key}",
+                "HTTP-Referer": settings.frontend_origin,
+                "X-Title": "Marketplace Keyword Agent",
+                "Content-Type": "application/json",
             }
+            key_failed = False
 
-            try:
-                async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                    resp = await client.post(
-                        f"{self.BASE_URL}/chat/completions",
-                        headers=headers,
-                        json=payload,
-                    )
+            for model in models:
+                payload = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
 
-                if resp.status_code == 200:
-                    data = resp.json()
-                    choices = data.get("choices", [])
-                    if choices and "message" in choices[0]:
-                        self.llm_calls_used += 1
-                        return choices[0]["message"].get("content", "")
-                    raise LLMCallError(f"Model '{model}' returned empty choices.")
+                try:
+                    async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                        resp = await client.post(
+                            f"{self.BASE_URL}/chat/completions",
+                            headers=headers,
+                            json=payload,
+                        )
 
-                elif resp.status_code == 401:
-                    logger.error("OpenRouter rejected user key (401 Unauthorized).")
-                    raise OpenRouterAuthError()
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        choices = data.get("choices", [])
+                        if choices and "message" in choices[0]:
+                            self.llm_calls_used += 1
+                            self.api_key = current_key
+                            return choices[0]["message"].get("content", "")
+                        raise LLMCallError(f"Model '{model}' returned empty choices.")
 
-                elif resp.status_code == 402:
-                    logger.error(f"OpenRouter insufficient credits for model '{model}' (402).")
-                    raise OpenRouterCreditsError()
+                    elif resp.status_code == 401:
+                        logger.error("OpenRouter rejected key (401 Unauthorized).")
+                        if key_idx + 1 < len(self.api_keys):
+                            logger.info(f"Failing over to backup key {key_idx + 2}/{len(self.api_keys)}")
+                            key_failed = True
+                            break
+                        raise OpenRouterAuthError()
 
-                elif resp.status_code == 429:
-                    logger.warning(f"OpenRouter rate limit on model '{model}' (429). Trying fallback.")
-                    last_error = OpenRouterRateLimitError()
-                    await asyncio.sleep(1.0)
-                    continue
+                    elif resp.status_code == 402:
+                        logger.error(f"OpenRouter insufficient credits for model '{model}' (402).")
+                        if key_idx + 1 < len(self.api_keys):
+                            logger.info(f"Failing over to backup key {key_idx + 2}/{len(self.api_keys)}")
+                            key_failed = True
+                            break
+                        raise OpenRouterCreditsError()
 
-                else:
-                    logger.warning(
-                        f"OpenRouter call failed on '{model}' with HTTP {resp.status_code}: {resp.text[:200]}"
-                    )
-                    last_error = LLMCallError(f"OpenRouter returned status {resp.status_code}.")
+                    elif resp.status_code == 429:
+                        logger.warning(f"OpenRouter rate limit on model '{model}' (429).")
+                        last_error = OpenRouterRateLimitError()
+                        if key_idx + 1 < len(self.api_keys):
+                            logger.info(f"Failing over to alternate key {key_idx + 2}/{len(self.api_keys)}")
+                            key_failed = True
+                            break
+                        await asyncio.sleep(1.0)
+                        continue
 
-            except (OpenRouterAuthError, OpenRouterCreditsError):
-                # Critical user credentials errors must not fall back to other models
-                raise
-            except httpx.RequestError as exc:
-                logger.warning(f"Network error calling OpenRouter with '{model}': {exc}")
-                last_error = LLMCallError(f"Network error contacting OpenRouter: {exc}")
+                    else:
+                        logger.warning(
+                            f"OpenRouter call failed on '{model}' with HTTP {resp.status_code}: {resp.text[:200]}"
+                        )
+                        last_error = LLMCallError(f"OpenRouter returned status {resp.status_code}.")
+
+                except (OpenRouterAuthError, OpenRouterCreditsError):
+                    if key_idx + 1 < len(self.api_keys):
+                        key_failed = True
+                        break
+                    raise
+                except httpx.RequestError as exc:
+                    logger.warning(f"Network error calling OpenRouter with '{model}': {exc}")
+                    last_error = LLMCallError(f"Network error contacting OpenRouter: {exc}")
+
+            if not key_failed:
+                break
 
         if isinstance(last_error, OpenRouterError):
             raise last_error
-        raise LLMCallError(str(last_error or "All fallback models failed."))
+        raise LLMCallError(str(last_error or "All fallback models and keys failed."))
 
     async def call_structured(
         self,

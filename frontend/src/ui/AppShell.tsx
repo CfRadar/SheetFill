@@ -47,20 +47,27 @@ export const AppShell: React.FC<AppShellProps> = ({ title = "Sheet Filler", chil
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200 relative">
+      {/* Ambient Aurora Liquid-Glass Background */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-30 dark:opacity-20 select-none">
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-sky-500/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: "8s" }} />
+      </div>
+
       {/* 56px Top Bar */}
       <Navbar
         isBordered
         maxWidth="full"
-        className="h-14 border-b border-divider bg-content1/90 backdrop-blur-md px-3 sm:px-6"
+        className="h-14 border-b border-divider/60 bg-content1/80 backdrop-blur-xl px-3 sm:px-6 relative z-10"
       >
         {/* Brand & Logo */}
-        <NavbarBrand className="gap-2.5 max-w-fit">
-          <div className="w-8 h-8 rounded-[8px] bg-primary flex items-center justify-center font-bold text-xs text-white shadow-xs shrink-0">
-            <Sparkles className="w-4 h-4" />
-          </div>
+        <NavbarBrand
+          className="gap-2.5 max-w-fit cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => setActiveSection("sheets")}
+        >
+          <img src="/logo.svg" alt="SheetFill" className="w-8 h-8 rounded-lg shadow-xs shrink-0" />
           <span className="font-semibold text-sm sm:text-base tracking-tight text-foreground hidden md:inline">
-            {title}
+            SheetFill
           </span>
         </NavbarBrand>
 

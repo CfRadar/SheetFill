@@ -268,11 +268,22 @@ export async function downloadWorkbookFile(
     );
   }
 
+  let resolvedFilename = filename;
+  if (!resolvedFilename) {
+    const disposition = res.headers.get("Content-Disposition");
+    if (disposition && disposition.includes("filename=")) {
+      const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) {
+        resolvedFilename = match[1].replace(/['"]/g, "").trim();
+      }
+    }
+  }
+
   const blob = await res.blob();
   const blobUrl = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = blobUrl;
-  a.download = filename || "Flipkart_Filled_TShirt_Sheet.xlsm";
+  a.download = resolvedFilename || "Flipkart_Filled_TShirt_Sheet.xlsm";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

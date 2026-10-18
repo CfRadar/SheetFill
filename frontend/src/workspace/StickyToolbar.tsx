@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   Button,
   Chip,
-  Progress,
   Tooltip,
   Popover,
   PopoverTrigger,
@@ -27,6 +26,7 @@ import {
   RotateCcw,
   MoreHorizontal,
   Layers,
+  Sparkles,
 } from "lucide-react";
 import { addSlots, generateWorkbook, getSession, downloadWorkbookFile } from "../api";
 import { useAppStore } from "../store";
@@ -69,6 +69,10 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
   const totalCount = designs.length;
   const needsCount = totalCount - readyCount;
   const percentReady = totalCount > 0 ? Math.round((readyCount / totalCount) * 100) : 0;
+
+  // Detect output extension
+  const isXls = filename?.toLowerCase().endsWith(".xls") && !filename?.toLowerCase().endsWith(".xlsm");
+  const extLabel = isXls ? ".xls" : ".xlsm";
 
   const handleAddSlots = async () => {
     if (slotCount < 1) return;
@@ -139,15 +143,15 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-content1 border-b border-divider px-4 sm:px-6 py-2 shadow-xs transition-colors">
+      <header className="sticky top-0 z-30 bg-content1/80 backdrop-blur-md border-b border-divider px-4 sm:px-6 py-2.5 shadow-xs transition-colors">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          {/* Left section: Drawer toggle (mobile), Workbook chip, ready progress */}
+          {/* Left section: Drawer toggle (mobile), Workbook chip, Circular progress ring */}
           <div className="flex items-center gap-3 min-w-0">
             {onToggleMobileDrawer && (
               <Button
                 size="sm"
                 variant="flat"
-                className="lg:hidden h-9 px-3 rounded-[10px] text-xs font-medium"
+                className="lg:hidden h-9 px-3 rounded-xl text-xs font-medium"
                 onPress={onToggleMobileDrawer}
                 startContent={<Layers className="w-3.5 h-3.5 text-primary" />}
               >
@@ -160,44 +164,69 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
               color="default"
               size="sm"
               startContent={<FileSpreadsheet className="w-3.5 h-3.5 shrink-0 ml-1 text-primary" />}
-              className="hidden sm:inline-flex h-7 text-xs font-medium max-w-xs truncate border border-divider"
+              className="hidden sm:inline-flex h-8 text-xs font-semibold max-w-xs truncate border border-divider/80 bg-content2/60"
             >
               {filename}
             </Chip>
 
-            <div className="hidden md:flex items-center gap-2.5 pl-3 border-l border-divider">
-              <span className="text-xs font-medium text-default-600 whitespace-nowrap">
-                {readyCount} of {totalCount} ready
-              </span>
-              <div className="w-40 h-1 bg-default-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300 ease-out"
-                  style={{ width: `${percentReady}%` }}
-                />
+            {/* Circular Progress Ring & Ready Status */}
+            <div className="hidden md:flex items-center gap-2.5 pl-3 border-l border-divider/80">
+              <div className="relative flex items-center justify-center w-7 h-7 shrink-0">
+                <svg className="w-7 h-7 transform -rotate-90">
+                  <circle
+                    cx="14"
+                    cy="14"
+                    r="11"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    fill="transparent"
+                    className="text-default-200 dark:text-default-800"
+                  />
+                  <circle
+                    cx="14"
+                    cy="14"
+                    r="11"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    fill="transparent"
+                    strokeDasharray={2 * Math.PI * 11}
+                    strokeDashoffset={2 * Math.PI * 11 * (1 - percentReady / 100)}
+                    className="text-primary transition-all duration-500 ease-out"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span className="absolute text-[9px] font-bold text-foreground">
+                  {percentReady}%
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-foreground whitespace-nowrap leading-none">
+                  {readyCount} of {totalCount} ready
+                </span>
+                <span className="text-[10px] text-default-400 mt-0.5 leading-none">
+                  {needsCount === 0 ? "All designs verified" : `${needsCount} pending info`}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Right section: Toolbar actions */}
+          {/* Right section: Consolidated Toolbar actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Desktop Actions (>= 1024px) */}
+            {/* Desktop Secondary Actions (>= 1024px) */}
             <div className="hidden lg:flex items-center gap-2">
-              {/* Secondary button: Paste all JSON */}
               <Button
                 size="sm"
                 variant="flat"
                 color="default"
                 startContent={<ClipboardPaste className="w-3.5 h-3.5 text-default-500" />}
                 onPress={onOpenBulkPaste}
-                className="h-9 px-3.5 rounded-[10px] font-medium text-xs text-foreground bg-content3 hover:bg-default-200 border border-divider transition-colors"
+                className="h-9 px-3.5 rounded-xl font-medium text-xs text-foreground bg-content2/80 hover:bg-default-200 border border-divider/80 transition-colors"
               >
                 Paste all JSON
               </Button>
 
-              {/* Secondary button: Prompt */}
               <PromptDropdown />
 
-              {/* Ghost button: Add slots Popover */}
               <Popover
                 isOpen={isPopoverOpen}
                 onOpenChange={setIsPopoverOpen}
@@ -209,12 +238,12 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                     size="sm"
                     variant="light"
                     startContent={<Plus className="w-3.5 h-3.5 text-default-500" />}
-                    className="h-9 px-3 rounded-[10px] font-medium text-xs text-default-600 hover:text-foreground"
+                    className="h-9 px-3 rounded-xl font-medium text-xs text-default-600 hover:text-foreground"
                   >
                     Add slots
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="p-3 w-56 rounded-[14px] border border-divider bg-content1 shadow-lg">
+                <PopoverContent className="p-3 w-56 rounded-2xl border border-divider bg-content1 shadow-xl">
                   <div className="flex flex-col gap-2">
                     <span className="text-xs font-semibold text-foreground">
                       Add empty design slots
@@ -235,7 +264,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                         color="primary"
                         isLoading={isAdding}
                         onPress={handleAddSlots}
-                        className="flex-1 font-medium rounded-[10px]"
+                        className="flex-1 font-medium rounded-xl"
                       >
                         Add
                       </Button>
@@ -247,13 +276,12 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                 </PopoverContent>
               </Popover>
 
-              {/* Ghost button: New sheet */}
               <Button
                 size="sm"
                 variant="light"
                 startContent={<RotateCcw className="w-3.5 h-3.5 text-default-500" />}
                 onPress={onOpenConfirm}
-                className="h-9 px-3 rounded-[10px] font-medium text-xs text-default-600 hover:text-foreground"
+                className="h-9 px-3 rounded-xl font-medium text-xs text-default-600 hover:text-foreground"
               >
                 New sheet
               </Button>
@@ -268,68 +296,44 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                     variant="flat"
                     color="default"
                     isIconOnly
-                    className="h-9 w-9 rounded-[10px] text-default-700 bg-content3 border border-divider"
+                    className="h-9 w-9 rounded-xl text-default-700 bg-content2/80 border border-divider"
                     aria-label="More actions"
                   >
                     <MoreHorizontal className="w-4 h-4" />
                   </Button>
                 </DropdownTrigger>
-                {session.download_url ? (
-                  <DropdownMenu aria-label="Toolbar options" variant="flat">
+                <DropdownMenu aria-label="Toolbar options" variant="flat">
+                  {session.download_url ? (
                     <DropdownItem
-                      key="download-xls"
+                      key="download-workbook"
                       startContent={<Download className="w-4 h-4 text-emerald-500" />}
                       onPress={handleDirectDownload}
                     >
-                      Download .xls
+                      Download {extLabel}
                     </DropdownItem>
-                    <DropdownItem
-                      key="paste-json"
-                      startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
-                      onPress={onOpenBulkPaste}
-                    >
-                      Paste all JSON
-                    </DropdownItem>
-                    <DropdownItem
-                      key="add-slots"
-                      startContent={<Plus className="w-4 h-4 text-default-500" />}
-                      onPress={() => setIsPopoverOpen(true)}
-                    >
-                      Add slots
-                    </DropdownItem>
-                    <DropdownItem
-                      key="new-sheet"
-                      startContent={<RotateCcw className="w-4 h-4 text-default-500" />}
-                      onPress={onOpenConfirm}
-                    >
-                      New sheet
-                    </DropdownItem>
-                  </DropdownMenu>
-                ) : (
-                  <DropdownMenu aria-label="Toolbar options" variant="flat">
-                    <DropdownItem
-                      key="paste-json"
-                      startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
-                      onPress={onOpenBulkPaste}
-                    >
-                      Paste all JSON
-                    </DropdownItem>
-                    <DropdownItem
-                      key="add-slots"
-                      startContent={<Plus className="w-4 h-4 text-default-500" />}
-                      onPress={() => setIsPopoverOpen(true)}
-                    >
-                      Add slots
-                    </DropdownItem>
-                    <DropdownItem
-                      key="new-sheet"
-                      startContent={<RotateCcw className="w-4 h-4 text-default-500" />}
-                      onPress={onOpenConfirm}
-                    >
-                      New sheet
-                    </DropdownItem>
-                  </DropdownMenu>
-                )}
+                  ) : null}
+                  <DropdownItem
+                    key="paste-json"
+                    startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
+                    onPress={onOpenBulkPaste}
+                  >
+                    Paste all JSON
+                  </DropdownItem>
+                  <DropdownItem
+                    key="add-slots"
+                    startContent={<Plus className="w-4 h-4 text-default-500" />}
+                    onPress={() => setIsPopoverOpen(true)}
+                  >
+                    Add slots
+                  </DropdownItem>
+                  <DropdownItem
+                    key="new-sheet"
+                    startContent={<RotateCcw className="w-4 h-4 text-default-500" />}
+                    onPress={onOpenConfirm}
+                  >
+                    New sheet
+                  </DropdownItem>
+                </DropdownMenu>
               </Dropdown>
             </div>
 
@@ -342,13 +346,13 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                 isLoading={isDownloading}
                 startContent={!isDownloading && <Download className="w-3.5 h-3.5" />}
                 onPress={handleDirectDownload}
-                className="h-9 px-3.5 rounded-[10px] font-semibold text-xs text-white bg-emerald-600 hover:bg-emerald-500 shadow-xs"
+                className="h-9 px-3.5 rounded-xl font-semibold text-xs text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-all"
               >
-                {isDownloading ? "Downloading..." : "Download .xls"}
+                {isDownloading ? "Downloading..." : `Download ${extLabel}`}
               </Button>
             )}
 
-            {/* Dominant Primary Action: Generate .xls (ALWAYS visible) */}
+            {/* High-Contrast Magnet CTA: Generate Workbook (ALWAYS visible) */}
             {readyCount === 0 ? (
               <Tooltip
                 content={
@@ -366,9 +370,9 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                     variant="solid"
                     isDisabled
                     startContent={<FileSpreadsheet className="w-3.5 h-3.5" />}
-                    className="h-9 px-3.5 rounded-[10px] font-semibold text-xs opacity-50 cursor-not-allowed"
+                    className="h-9 px-4 rounded-xl font-semibold text-xs opacity-50 cursor-not-allowed"
                   >
-                    Generate .xls
+                    Generate {extLabel}
                   </Button>
                 </span>
               </Tooltip>
@@ -378,11 +382,11 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                 color="primary"
                 variant="solid"
                 isLoading={isGenerating}
-                startContent={!isGenerating && <FileSpreadsheet className="w-3.5 h-3.5" />}
+                startContent={!isGenerating && <Sparkles className="w-3.5 h-3.5 text-indigo-200" />}
                 onPress={handleGenerate}
-                className="h-9 px-4 rounded-[10px] font-semibold text-xs text-white shadow-xs"
+                className="h-9 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 shadow-md shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
-                {isGenerating ? "Generating..." : "Generate .xls"}
+                {isGenerating ? "Generating..." : `Generate ${extLabel}`}
               </Button>
             )}
           </div>
@@ -391,7 +395,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
 
       {/* New Sheet Confirmation Modal */}
       <Modal isOpen={isConfirmOpen} onOpenChange={onConfirmChange} size="sm">
-        <ModalContent className="rounded-[14px] border border-divider bg-content1 shadow-xl">
+        <ModalContent className="rounded-2xl border border-divider bg-content1 shadow-2xl">
           {(onClose) => (
             <>
               <ModalHeader className="text-base font-semibold border-b border-divider py-3 px-5">
@@ -401,13 +405,13 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                 Your current sheet progress and designs will be cleared from this browser session.
               </ModalBody>
               <ModalFooter className="border-t border-divider py-3 px-5 flex items-center justify-end gap-2">
-                <Button size="sm" variant="light" onPress={onClose} className="rounded-[10px]">
+                <Button size="sm" variant="light" onPress={onClose} className="rounded-xl">
                   Cancel
                 </Button>
                 <Button
                   size="sm"
                   color="danger"
-                  className="rounded-[10px] font-medium"
+                  className="rounded-xl font-medium"
                   onPress={() => {
                     onClose();
                     onNewSheet();

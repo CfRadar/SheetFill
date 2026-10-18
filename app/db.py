@@ -25,6 +25,9 @@ async def connect_and_init_db(max_retries: int = 5, initial_delay: float = 1.0) 
             logger.info(f"Connecting to MongoDB (attempt {attempt}/{max_retries})...")
             _client = AsyncIOMotorClient(
                 settings.mongodb_uri,
+                maxPoolSize=50,
+                minPoolSize=10,
+                maxIdleTimeMS=45000,
                 serverSelectionTimeoutMS=4000,
             )
             # Ping database to confirm connectivity
