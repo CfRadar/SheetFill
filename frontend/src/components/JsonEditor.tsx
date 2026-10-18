@@ -266,6 +266,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
             {/* Textarea */}
             <textarea
               ref={textareaRef}
+              aria-label="Design JSON editor"
               rows={lineCount}
               value={text}
               onChange={handleChange}

@@ -263,6 +263,7 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
                 size="sm"
                 variant="bordered"
                 radius="sm"
+                aria-label="Brand"
                 placeholder="fashion continental"
                 value={brand}
                 onValueChange={setBrand}
@@ -287,6 +288,7 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
                 size="sm"
                 variant="bordered"
                 radius="sm"
+                aria-label="Manufacturer"
                 placeholder="fashion continental"
                 value={manufacturer}
                 onValueChange={setManufacturer}
@@ -311,6 +313,7 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
                 size="sm"
                 variant="bordered"
                 radius="sm"
+                aria-label="Packer"
                 placeholder="fashion continental"
                 value={packer}
                 onValueChange={setPacker}
@@ -335,6 +338,7 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
                 size="sm"
                 variant="bordered"
                 radius="sm"
+                aria-label="HSN Code"
                 placeholder="610910"
                 value={hsn}
                 onValueChange={setHsn}
@@ -360,6 +364,7 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
                 variant="bordered"
                 radius="sm"
                 type="number"
+                aria-label="Maximum Retail Price"
                 placeholder="1999"
                 value={mrp}
                 onValueChange={setMrp}
@@ -385,6 +390,7 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
                 variant="bordered"
                 radius="sm"
                 type="number"
+                aria-label="Selling Price"
                 placeholder="749"
                 value={sellingPrice}
                 onValueChange={setSellingPrice}

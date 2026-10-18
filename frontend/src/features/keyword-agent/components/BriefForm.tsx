@@ -183,6 +183,7 @@ export const BriefForm: React.FC<Props> = ({
         </label>
         <Input
           size="sm"
+          aria-label="T-Shirt Silhouette"
           placeholder="e.g. Oversized T-Shirt, Polo T-Shirt"
           value={brief.tshirt_type || ""}
           onValueChange={(val) => handleUpdate("tshirt_type", val)}
@@ -220,6 +221,7 @@ export const BriefForm: React.FC<Props> = ({
         </label>
         <Input
           size="sm"
+          aria-label="Garment Color"
           placeholder="e.g. Black, Navy Blue, Maroon"
           value={brief.color || ""}
           onValueChange={(val) => handleUpdate("color", val)}
@@ -262,6 +264,7 @@ export const BriefForm: React.FC<Props> = ({
           <label className="text-xs font-semibold text-foreground block mb-1">Brand Name</label>
           <Input
             size="sm"
+            aria-label="Brand Name"
             placeholder="e.g. UrbanStyle"
             value={brief.brand_name || ""}
             onValueChange={(val) => handleUpdate("brand_name", val)}
@@ -276,6 +279,7 @@ export const BriefForm: React.FC<Props> = ({
           <Input
             size="sm"
             type="number"
+            aria-label="Min Price (₹)"
             placeholder="599"
             value={brief.price_min ? String(brief.price_min) : ""}
             onValueChange={(val) => handleUpdate("price_min", val ? Number(val) : null)}
@@ -290,6 +294,7 @@ export const BriefForm: React.FC<Props> = ({
           <Input
             size="sm"
             type="number"
+            aria-label="Max Price (₹)"
             placeholder="999"
             value={brief.price_max ? String(brief.price_max) : ""}
             onValueChange={(val) => handleUpdate("price_max", val ? Number(val) : null)}
@@ -309,6 +314,7 @@ export const BriefForm: React.FC<Props> = ({
         <Textarea
           minRows={2}
           maxRows={4}
+          aria-label="Special Aesthetic or Graphics Note"
           placeholder="e.g. Heavyweight 240 GSM drop shoulder streetwear tee with Japanese anime back print"
           value={brief.extra_details || ""}
           onValueChange={(val) => handleUpdate("extra_details", val)}

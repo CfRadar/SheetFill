@@ -269,6 +269,7 @@ export const KeySettingsModal: React.FC<Props> = ({ isOpen, onClose, onKeyUpdate
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <Input
                 size="sm"
+                aria-label="Key label"
                 placeholder="Key label (e.g. Primary)"
                 value={keyLabelInput}
                 onValueChange={setKeyLabelInput}
@@ -276,6 +277,7 @@ export const KeySettingsModal: React.FC<Props> = ({ isOpen, onClose, onKeyUpdate
               />
               <Input
                 size="sm"
+                aria-label="OpenRouter API Key"
                 type={showKey ? "text" : "password"}
                 placeholder="sk-or-v1-..."
                 value={apiKeyInput}
