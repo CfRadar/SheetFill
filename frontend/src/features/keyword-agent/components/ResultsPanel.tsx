@@ -125,9 +125,9 @@ export const ResultsPanel: React.FC<Props> = ({ result, briefSummary }) => {
       </div>
 
       {/* Main Single-Viewport 2-Column Grid for Desktop */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 flex-1 xl:min-h-0">
-        {/* Left Column: Visual Analytics, Competitor Drill-Down, Refinement (5/12 width) */}
-        <div className="xl:col-span-5 flex flex-col gap-3 xl:h-full xl:overflow-hidden">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3.5 flex-1 xl:min-h-0">
+        {/* Left Column: Visual Analytics & Refinement (5/12 width) */}
+        <div className="xl:col-span-5 flex flex-col gap-3.5 xl:h-full xl:overflow-y-auto pr-0.5">
           {/* Platform Treemap */}
           <div className="p-3.5 rounded-2xl border border-divider/80 bg-content1/80 backdrop-blur-sm shrink-0">
             <PlatformTreemap
@@ -147,59 +147,13 @@ export const ResultsPanel: React.FC<Props> = ({ result, briefSummary }) => {
             </div>
           )}
 
-          {/* Live Scraped Competitors list (Scrollable) */}
-          <div className="flex-1 rounded-2xl border border-divider/80 bg-content1/80 backdrop-blur-sm p-3.5 flex flex-col min-h-[160px] xl:min-h-0 xl:overflow-hidden">
-            <div className="flex items-center justify-between pb-2 border-b border-divider/60 shrink-0">
-              <span className="text-xs font-semibold text-foreground">
-                Top Scraped Competitors ({activePlatformResult?.top_scraped_titles?.length || 0})
-              </span>
-              <span className="text-[10px] text-default-400">
-                Click listing to inspect
-              </span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-1.5 pt-2 pr-1">
-              {activePlatformResult?.top_scraped_titles &&
-              activePlatformResult.top_scraped_titles.length > 0 ? (
-                activePlatformResult.top_scraped_titles.map((comp, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setActiveCompetitor(comp)}
-                    className="w-full p-2 rounded-xl bg-content2/50 hover:bg-content2/90 border border-divider/60 text-left transition-all flex items-start justify-between gap-2 group select-none"
-                  >
-                    <span className="font-mono text-[10px] text-default-400 font-bold shrink-0 mt-0.5">
-                      #{comp.rank || idx + 1}
-                    </span>
-                    <span className="text-xs text-foreground group-hover:text-primary transition-colors flex-1 line-clamp-1 leading-snug">
-                      {comp.title}
-                    </span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {comp.rating ? (
-                        <span className="flex items-center gap-0.5 text-[10px] text-amber-500 font-semibold">
-                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                          {comp.rating.toFixed(1)}
-                        </span>
-                      ) : null}
-                      <ChevronRight className="w-3.5 h-3.5 text-default-400 group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="p-4 text-center text-xs text-default-400">
-                  No competitor titles available for this platform.
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Interactive Chat Refinement Box */}
           <div className="shrink-0">
             <RefineBox runId={result.run_id} />
           </div>
         </div>
 
-        {/* Right Column: Titles, Keywords, Platform Attributes (7/12 width, Scrollable) */}
+        {/* Right Column: Titles, Keywords, Competitors, Platform Attributes (7/12 width, Scrollable) */}
         <div className="xl:col-span-7 xl:h-full xl:overflow-y-auto flex flex-col gap-4 pr-1">
           {activePlatformResult && (
             <>
@@ -237,7 +191,58 @@ export const ResultsPanel: React.FC<Props> = ({ result, briefSummary }) => {
                 platformTitle={PLATFORM_LABELS[activePlatformResult.platform]}
               />
 
-              {/* Section 3: Platform Details & Attributes to Fill */}
+              {/* Section 3: Live Scraped Competitors list */}
+              <div className="rounded-2xl border border-divider/80 bg-content1/80 backdrop-blur-sm p-4 flex flex-col gap-2.5 shadow-2xs">
+                <div className="flex items-center justify-between pb-2 border-b border-divider/60">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                      Top Scraped Competitors
+                    </h4>
+                    <span className="text-[11px] font-mono text-default-400 font-semibold px-1.5 py-0.5 rounded-md bg-content2">
+                      {activePlatformResult?.top_scraped_titles?.length || 0}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-default-400">
+                    Click listing to inspect details & keywords
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                  {activePlatformResult?.top_scraped_titles &&
+                  activePlatformResult.top_scraped_titles.length > 0 ? (
+                    activePlatformResult.top_scraped_titles.map((comp, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveCompetitor(comp)}
+                        className="w-full p-2.5 rounded-xl bg-content2/50 hover:bg-content2/90 border border-divider/60 text-left transition-all flex items-center justify-between gap-3 group select-none cursor-pointer"
+                      >
+                        <span className="font-mono text-[10px] text-default-400 font-bold shrink-0">
+                          #{comp.rank || idx + 1}
+                        </span>
+                        <span className="text-xs text-foreground group-hover:text-primary transition-colors flex-1 line-clamp-1 leading-snug">
+                          {comp.title}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {comp.rating ? (
+                            <span className="flex items-center gap-1 text-[11px] text-amber-500 font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded-md">
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                              {comp.rating.toFixed(1)}
+                            </span>
+                          ) : null}
+                          <ChevronRight className="w-3.5 h-3.5 text-default-400 group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-xs text-default-400">
+                      No competitor titles available for this platform.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Section 4: Platform Details & Attributes to Fill */}
               <DetailsAccordion
                 details={activePlatformResult.details}
                 platform={activePlatformResult.platform}
