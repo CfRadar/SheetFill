@@ -3,73 +3,94 @@ import { Button } from "@heroui/react";
 import { Check, FileText } from "lucide-react";
 import { toast } from "../ui/ToastProvider";
 
-export const FLIPKART_TSHIRT_PROMPT = `You are a Flipkart catalog specialist. I have uploaded ONE reference image of a T-shirt design. Analyze the reference image carefully and take EVERYTHING directly from it. Identify the actual product type, garment color, gender, fit, sleeve length, artwork, graphics, characters, typography, colors, design placement, theme, aesthetic, and every other visible detail from the image itself. Do not assume the product is always a black oversized women's T-shirt. The product description and listing must adapt entirely to what is actually shown in the reference image.
+export const FLIPKART_TSHIRT_PROMPT = `You are a Flipkart catalog specialist. I will upload exactly ONE reference image containing a T-shirt worn by a model. Analyze this image carefully and derive ALL product information exclusively from what is visibly supported by the image, including garment type, gender, color, fit, sleeve length, neckline, length, artwork, graphics, typography, design placement, pattern, and styling. Do not assume the garment is women's, men's, unisex, black, oversized, or any particular style. The model's appearance alone must not determine the garment's gender category. Use only visible evidence, and never invent or assume missing details. If a detail cannot be reliably determined from the image, use an appropriate neutral value or an empty string where permitted.
 
-Return ONLY a valid JSON object (no Markdown fences, no explanation) that follows the EXAMPLE below exactly in structure, length, and writing style. Use the reference image as the primary source of truth for every field. Preserve the design's distinctive visual identity and accurately describe its details. Generate a relevant, SEO-friendly product title and listing suitable for Flipkart, while following marketplace listing guidelines. Do not invent features, colors, characters, materials, or other details that are not supported by the reference image. Do not include brand or celebrity names, or copyrighted character names, in the listing.
+Return ONLY a valid JSON object, without Markdown fences or explanations. Follow the exact JSON structure, field order, and writing style of the example. Generate an SEO-friendly Flipkart listing that accurately represents the uploaded product and complies with marketplace guidelines. Do not include brand names, celebrity names, or copyrighted character names.
 
-HARD LENGTH LIMITS (do not exceed)
-- product_title: 5-7 words, max 45 characters. Generic, with no design name. Always: "Women’s Premium Oversized Printed T-Shirt"
-- product_description: exactly 3 sentences, max 450 characters.
-- key_features: exactly 10 items, each 3-8 words, max 50 characters. No full sentences.
-- key_features_sheet: exactly 4 items, max 25 characters each.
-- search_keywords: exactly 4 items, max 20 characters each.
-- description_override: built ONLY from the fields above in the exact layout shown in the example. Do not add any extra sentences, headings or marketing text. Total must stay under 1000 characters.
+HARD LENGTH LIMITS
+- product_title: 5–7 words, maximum 45 characters. Generate a title matching the actual garment and its visibly supported characteristics. Do not force a fixed gender, color, or fit.
+- product_description: Exactly 3 sentences, maximum 450 characters.
+- key_features: Exactly 10 items, each 3–8 words, maximum 50 characters per item.
+- key_features_sheet: Exactly 4 items, maximum 25 characters each.
+- search_keywords: Exactly 4 items, maximum 20 characters each.
+- description_override: Use only the specified template and information from the generated JSON fields. Do not add extra headings, sentences, or marketing claims. Maximum 1000 characters.
 
 CONTENT RULES
-1. Describe only what is visible in the images.
-2. No trademarked brand names, character names or celebrity names. Describe the art generically (e.g. "retro cartoon-inspired graphic print").
-3. Women only. Never write "Men’s/Women’s" or "Unisex".
-4. Sleeves are 3/4 sleeves. Never write "short sleeves" or "half sleeves".
-5. sku_base: not required in JSON (the system automatically uses the design name from your sheet).
-6. Multi-value fields use "::" with no spaces around it.
-7. For pattern, surface_styling, detail_placement and tee_length use ONLY the allowed values below, with exact spelling and capitalisation.
+1. The single uploaded reference image is the sole source of truth for all product-specific details. Do not use assumptions, previous listings, example values, or default product attributes.
+2. Identify the actual garment and its characteristics from the image. Adapt every relevant JSON field to the visible product, including gender category, garment color, brand color, fit, sleeves, neckline, length, material when verifiable, pattern, surface styling, and print placement.
+3. Do not automatically classify the garment as women's or men's based only on the model's gender or appearance. Select a gender category only when supported by reliable product-specific visual evidence; otherwise use an appropriate neutral value permitted by the schema.
+4. Never force 3/4 sleeves, oversized fit, round neck, black color, cotton blend, or any other example attribute unless the image supports it. Describe sleeve length and neckline accurately. If the exact sleeve length or material cannot be established visually, do not invent it.
+5. Do not describe invisible fabric properties, comfort, breathability, durability, print quality, or care requirements as verified facts unless explicitly supported by the image. Use neutral wording or empty values where permitted.
+6. Do not include trademarked brand names, celebrity names, or copyrighted character names. Describe recognizable artwork generically.
+7. Use "::" to separate multiple values, with no spaces around the separator.
+8. For pattern, surface_styling, detail_placement, and tee_length, use only the allowed values below, with exact spelling and capitalization.
 
 ALLOWED VALUES
-pattern (1-3): Abstract | Animal Print | Applique | Cartoon | Checkered | Chevron/Zig Zag | Colorblock | Conversational | Diamante Print | Embroidered | Floral Print | Geometric Print | Graphic Print | Military Camouflage | Ombre | Polka Print | Printed | Self Design | Solid | Sporty | Striped | Superhero | Tie & Dye | Tribal Print | Typography | Washed | Washed/Ombre
-surface_styling (1-2 or "None"): Applique | Beads & Stones | Bow | Braids | Brand Logo | Buttons | Crochets & Schiffily | Cut-Outs | Cut-work | Epaulettes | Eyelets | Fringed | Knots | Laces | Mesh | Metal Embellishment | None | Patch Work | Pearl | Perforation | Piping Details | Pocket Flap | Pockets | Pompom | Ruffled | Sequins | Shimmer | Side Stripe | Statement Logo | Tassels | Thread Work | Tie-Ups | Twill Tape | Typography | Zipper Details
+
+pattern (1–3): Abstract | Animal Print | Applique | Cartoon | Checkered | Chevron/Zig Zag | Colorblock | Conversational | Diamante Print | Embroidered | Floral Print | Geometric Print | Graphic Print | Military Camouflage | Ombre | Polka Print | Printed | Self Design | Solid | Sporty | Striped | Superhero | Tie & Dye | Tribal Print | Typography | Washed | Washed/Ombre
+
+surface_styling (1–2 or "None"): Applique | Beads & Stones | Bow | Braids | Brand Logo | Buttons | Crochets & Schiffily | Cut-Outs | Cut-work | Epaulettes | Eyelets | Fringed | Knots | Laces | Mesh | Metal Embellishment | None | Patch Work | Pearl | Perforation | Piping Details | Pocket Flap | Pockets | Pompom | Ruffled | Sequins | Shimmer | Side Stripe | Statement Logo | Tassels | Thread Work | Tie-Ups | Twill Tape | Typography | Zipper Details
+
 detail_placement (1): All Over | Back Panel | Chest | Front Panel | Hemline | Hood | Neckline | None | Pocket | Side | Sleeve
+
 tee_length (1): Crop | Long | Medium | Short
 
-EXAMPLE (copy this structure, length and style; replace only the design-specific parts)
+REFERENCE JSON STRUCTURE
+
+Use the following example only as a structural template, not as a source of product facts. Replace every example-specific value with information supported by the uploaded image. Preserve all keys and their order.
+
 {
-  "product_title": "Women’s Premium Oversized Printed T-Shirt",
-  "product_description": "Add a stylish retro touch to your everyday wardrobe with this premium black oversized printed T-shirt. Designed with a relaxed silhouette and a bold retro cartoon-inspired graphic print, this T-shirt combines comfort with a modern streetwear aesthetic. The soft, breathable fabric and oversized fit make it suitable for casual outings, college wear, travel, and everyday styling.",
+  "product_title": "",
+  "product_description": "",
   "key_features": [
-    "Premium-quality fabric",
-    "Stylish oversized / relaxed fit",
-    "Bold high-definition front graphic print",
-    "Classic round crew neck",
-    "3/4 sleeves",
-    "Soft and comfortable feel",
-    "Breathable and lightweight construction",
-    "Durable print with vibrant detailing",
-    "Easy to wash and maintain",
-    "Suitable for casual, streetwear and everyday looks"
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
   ],
-  "material": "Cotton Blend",
-  "pattern": "Graphic Print",
-  "sleeve_type": "3/4 Sleeve",
-  "neck_type": "Round Neck",
-  "fit_type": "Oversized",
-  "ideal_for": "Women",
-  "color": "Black",
-  "brand_color": "Black",
-  "occasion": "Casual",
+  "material": "",
+  "pattern": "",
+  "sleeve_type": "",
+  "neck_type": "",
+  "fit_type": "",
+  "ideal_for": "",
+  "color": "",
+  "brand_color": "",
+  "occasion": "",
   "style_code": "",
-  "description_override": "Women’s Premium Oversized Printed T-Shirt\\n\\nAdd a stylish retro touch to your everyday wardrobe with this premium black oversized printed T-shirt. Designed with a relaxed silhouette and a bold retro cartoon-inspired graphic print, this T-shirt combines comfort with a modern streetwear aesthetic. The soft, breathable fabric and oversized fit make it suitable for casual outings, college wear, travel, and everyday styling.\\n\\nKey Features:\\n\\nPremium-quality fabric\\nStylish oversized / relaxed fit\\nBold high-definition front graphic print\\nClassic round crew neck\\n3/4 sleeves\\nSoft and comfortable feel\\nBreathable and lightweight construction\\nDurable print with vibrant detailing\\nEasy to wash and maintain\\nSuitable for casual, streetwear and everyday looks\\n\\nStyle: Oversized / Relaxed Fit\\nColor: Black\\nPattern: Graphic Print\\nNeck: Round Neck\\nSleeve: 3/4 Sleeve\\nOccasion: Casual, Streetwear, Daily Wear\\nPrint Placement: Front Only",
-  "search_keywords": "Graphic Print::Cartoon::Oversized::Casual",
-  "key_features_sheet": "Graphic Print::Oversized Fit::Premium Cotton Fabric::Skin-Friendly Fabric",
-  "fabric_care": "Regular Machine Wash",
-  "surface_styling": "Typography",
-  "tee_length": "Medium",
-  "print_coverage": "Chest",
-  "sleeve_details": "No Details",
-  "detail_placement": "Front Panel",
+  "description_override": "",
+  "search_keywords": "",
+  "key_features_sheet": "",
+  "fabric_care": "",
+  "surface_styling": "",
+  "tee_length": "",
+  "print_coverage": "",
+  "sleeve_details": "",
+  "detail_placement": "",
   "detail_placement_rows": ["S","M","L","XL"]
 }
 
+DESCRIPTION_OVERRIDE RULES
+
+Build description_override from the generated product_title, product_description, and key_features, followed by the style, color, pattern, neckline, sleeve, occasion, and print-placement details in the same layout as the example. Keep it under 1000 characters. Ensure every value agrees with the other JSON fields. Do not retain example-specific details that contradict the reference image.
+
+FINAL VALIDATION
+- Return valid JSON only, with double-quoted keys and string values where applicable.
+- Include exactly the keys and order shown in the reference structure.
+- Include exactly 10 key_features and 4 "::"-separated search_keywords and key_features_sheet entries.
+- Use only allowed values for pattern, surface_styling, detail_placement, and tee_length.
+- Derive every product-specific attribute from the single uploaded image, not from the model's assumed gender, example defaults, or previous products.
+- Never force a fixed title, gender, sleeve length, fit, color, fabric, or neckline.
+- Do not invent details to fill missing visual information.
+
 TASK
-Now produce the JSON for the uploaded design. Keep every fixed field exactly as in the example (material, sleeve_type, neck_type, fit_type, ideal_for, color, brand_color, occasion, style_code, fabric_care, print_coverage, sleeve_details, detail_placement_rows, and the whole template text of description_override). Change only what depends on the design: the print wording in product_description and key_features[0], pattern, search_keywords, key_features_sheet[0], surface_styling, tee_length, detail_placement and "Print Placement". Output the JSON only.`;
+Analyze the single uploaded reference image and generate the complete Flipkart product listing JSON. The image is the only reference. Output JSON only.`;
 
 export const PromptDropdown: React.FC = () => {
   const [copied, setCopied] = useState(false);
