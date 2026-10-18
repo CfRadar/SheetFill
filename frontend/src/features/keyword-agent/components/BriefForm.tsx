@@ -6,10 +6,8 @@ import {
   Chip,
   Accordion,
   AccordionItem,
-  Card,
-  CardBody,
 } from "@heroui/react";
-import { Sparkles, SlidersHorizontal, RotateCcw, Compass } from "lucide-react";
+import { Sparkles, SlidersHorizontal, Compass, Check } from "lucide-react";
 import { PlatformPicker } from "./PlatformPicker";
 import type { ProductBrief, PlatformName } from "../types";
 
@@ -32,15 +30,15 @@ const TSHIRT_TYPES = [
   "Sleeveless Tank",
 ];
 
-const POPULAR_COLORS = [
-  "Black",
-  "White",
-  "Navy Blue",
-  "Olive Green",
-  "Beige",
-  "Maroon",
-  "Grey Melange",
-  "Lavender",
+const COLOR_SWATCHES: { name: string; hex: string; isLight?: boolean }[] = [
+  { name: "Black", hex: "#111827" },
+  { name: "White", hex: "#FFFFFF", isLight: true },
+  { name: "Navy Blue", hex: "#1E3A8A" },
+  { name: "Olive Green", hex: "#3F6212" },
+  { name: "Beige", hex: "#D4C5B9" },
+  { name: "Maroon", hex: "#831843" },
+  { name: "Grey Melange", hex: "#9CA3AF" },
+  { name: "Lavender", hex: "#C084FC" },
 ];
 
 const GENDERS: Array<ProductBrief["gender"]> = ["men", "women", "unisex", "kids"];
@@ -119,357 +117,321 @@ export const BriefForm: React.FC<Props> = ({
     Boolean(brief.color?.trim());
 
   return (
-    <Card className="border border-divider/70 bg-content1 shadow-xs">
-      <CardBody className="p-4 sm:p-5 flex flex-col gap-4">
-        {/* Sample Presets Header */}
-        <div className="flex items-center justify-between gap-2 pb-2 border-b border-divider/60">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-default-600">
-            <Compass className="w-3.5 h-3.5 text-primary" />
-            <span>Product Brief</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-default-400">Presets:</span>
-            {SAMPLE_BRIEFS.map((s) => (
-              <Button
-                key={s.label}
-                size="sm"
-                variant="flat"
-                className="h-6 text-[10px] px-2 py-0 bg-default-100 hover:bg-default-200 text-default-700"
-                onPress={() => handleLoadSample(s.brief)}
+    <div className="w-full max-w-4xl mx-auto rounded-2xl border border-divider/80 bg-content1/80 backdrop-blur-md p-5 sm:p-7 flex flex-col gap-6 shadow-xs">
+      {/* Sample Presets Header Bar */}
+      <div className="flex items-center justify-between gap-2 pb-3 border-b border-divider/60 flex-wrap">
+        <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+          <Compass className="w-4 h-4 text-primary" />
+          <span>Product Brief & Targeting</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-default-400">Quick Presets:</span>
+          {SAMPLE_BRIEFS.map((s) => (
+            <Button
+              key={s.label}
+              size="sm"
+              variant="flat"
+              className="h-7 text-xs px-2.5 rounded-lg font-medium bg-content2 hover:bg-default-200 text-default-700 border border-divider/60"
+              onPress={() => handleLoadSample(s.brief)}
+            >
+              {s.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Section 1: Target Marketplaces (Single heading, no duplicate label) */}
+      <div>
+        <PlatformPicker
+          selectedPlatforms={brief.platforms}
+          onChange={(plats) => handleUpdate("platforms", plats)}
+        />
+      </div>
+
+      {/* Section 2: Target Audience */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+          <span>Target Audience</span>
+          <span className="text-[11px] text-default-400 font-normal">Select one</span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {GENDERS.map((g) => {
+            const active = brief.gender === g;
+            return (
+              <button
+                key={g}
+                type="button"
+                onClick={() => handleUpdate("gender", g)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold capitalize border transition-all duration-150 select-none ${
+                  active
+                    ? "bg-primary text-white border-primary shadow-xs"
+                    : "bg-content2/60 hover:bg-content2 border-divider text-default-600 hover:text-foreground"
+                }`}
               >
-                {s.label.split(" ")[0]} {s.label.split(" ")[1]}
-              </Button>
-            ))}
-          </div>
+                {g}
+              </button>
+            );
+          })}
         </div>
+      </div>
 
-        {/* Target Platforms */}
-        <div>
-          <label className="text-xs font-medium text-foreground block mb-1.5">
-            Target Marketplaces <span className="text-danger">*</span>
-          </label>
-          <PlatformPicker
-            selectedPlatforms={brief.platforms}
-            onChange={(plats) => handleUpdate("platforms", plats)}
-          />
-        </div>
-
-        {/* Gender Selection */}
-        <div>
-          <label className="text-xs font-medium text-foreground block mb-1.5">
-            Target Audience <span className="text-danger">*</span>
-          </label>
-          <div className="flex flex-wrap gap-1.5">
-            {GENDERS.map((g) => {
-              const active = brief.gender === g;
-              return (
-                <Chip
-                  key={g}
-                  size="sm"
-                  variant={active ? "solid" : "bordered"}
-                  color={active ? "primary" : "default"}
-                  className="cursor-pointer capitalize text-xs select-none"
-                  onClick={() => handleUpdate("gender", g)}
-                >
-                  {g}
-                </Chip>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* T-Shirt Type */}
-        <div>
-          <label className="text-xs font-medium text-foreground block mb-1">
-            T-Shirt Type / Silhouette <span className="text-danger">*</span>
-          </label>
-          <Input
-            size="sm"
-            placeholder="e.g. Oversized T-Shirt, Polo T-Shirt"
-            value={brief.tshirt_type || ""}
-            onValueChange={(val) => handleUpdate("tshirt_type", val)}
-            classNames={{ inputWrapper: "h-9" }}
-          />
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {TSHIRT_TYPES.map((type) => (
+      {/* Section 3: T-Shirt Silhouette */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+          <span>T-Shirt Silhouette</span>
+          <span className="text-[11px] text-default-400 font-normal">Pick or type custom</span>
+        </label>
+        <Input
+          size="sm"
+          aria-label="T-Shirt Silhouette"
+          placeholder="e.g. Oversized T-Shirt, Polo T-Shirt"
+          value={brief.tshirt_type || ""}
+          onValueChange={(val) => handleUpdate("tshirt_type", val)}
+          classNames={{
+            inputWrapper: "h-9 rounded-xl border-divider bg-content2/40",
+            input: "text-xs font-medium",
+          }}
+        />
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {TSHIRT_TYPES.map((type) => {
+            const isSelected = brief.tshirt_type === type;
+            return (
               <button
                 key={type}
                 type="button"
-                className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
-                  brief.tshirt_type === type
-                    ? "bg-primary-50 border-primary text-primary font-medium dark:bg-primary-950/40"
-                    : "border-divider text-default-500 hover:border-default-400"
-                }`}
                 onClick={() => handleUpdate("tshirt_type", type)}
+                className={`text-xs px-2.5 py-1 rounded-xl border transition-all select-none ${
+                  isSelected
+                    ? "bg-primary-50 dark:bg-primary-950/40 border-primary text-primary font-bold shadow-2xs"
+                    : "bg-content2/40 hover:bg-content2 border-divider text-default-600 hover:text-foreground"
+                }`}
               >
                 {type}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
+      </div>
 
-        {/* Primary Color */}
-        <div>
-          <label className="text-xs font-medium text-foreground block mb-1">
-            Primary Color <span className="text-danger">*</span>
-          </label>
-          <Input
-            size="sm"
-            placeholder="e.g. Black, Navy Blue, Sage Green"
-            value={brief.color || ""}
-            onValueChange={(val) => handleUpdate("color", val)}
-            classNames={{ inputWrapper: "h-9" }}
-          />
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {POPULAR_COLORS.map((col) => (
+      {/* Section 4: Color with Interactive Swatches */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+          <span>Garment Color</span>
+          <span className="text-[11px] text-default-400 font-normal">Click swatch or type custom</span>
+        </label>
+        <Input
+          size="sm"
+          aria-label="Garment Color"
+          placeholder="e.g. Black, Navy Blue, Maroon"
+          value={brief.color || ""}
+          onValueChange={(val) => handleUpdate("color", val)}
+          classNames={{
+            inputWrapper: "h-9 rounded-xl border-divider bg-content2/40",
+            input: "text-xs font-medium",
+          }}
+        />
+        <div className="flex flex-wrap gap-2 pt-1">
+          {COLOR_SWATCHES.map((swatch) => {
+            const isSelected = brief.color?.toLowerCase() === swatch.name.toLowerCase();
+            return (
               <button
-                key={col}
+                key={swatch.name}
                 type="button"
-                className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
-                  brief.color === col
-                    ? "bg-primary-50 border-primary text-primary font-medium dark:bg-primary-950/40"
-                    : "border-divider text-default-500 hover:border-default-400"
+                onClick={() => handleUpdate("color", swatch.name)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium border transition-all select-none ${
+                  isSelected
+                    ? "bg-primary-50 dark:bg-primary-950/40 border-primary text-primary font-bold shadow-2xs"
+                    : "bg-content2/40 hover:bg-content2 border-divider text-default-600 hover:text-foreground"
                 }`}
-                onClick={() => handleUpdate("color", col)}
               >
-                {col}
+                <span
+                  className={`w-3.5 h-3.5 rounded-full inline-block shrink-0 shadow-2xs ${
+                    swatch.isLight ? "border border-default-300" : ""
+                  }`}
+                  style={{ backgroundColor: swatch.hex }}
+                />
+                <span>{swatch.name}</span>
+                {isSelected && <Check className="w-3 h-3 text-primary ml-0.5" />}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
+      </div>
 
-        {/* Brand Name */}
+      {/* Section 5: Brand & Pricing */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
-          <label className="text-xs font-medium text-foreground block mb-1">
-            Brand Name <span className="text-[11px] text-default-400 font-normal">(Included in Title Engine rules)</span>
-          </label>
+          <label className="text-xs font-semibold text-foreground block mb-1">Brand Name</label>
           <Input
             size="sm"
-            placeholder="e.g. Roadster, Wrogn, Generic"
+            aria-label="Brand Name"
+            placeholder="e.g. UrbanStyle"
             value={brief.brand_name || ""}
             onValueChange={(val) => handleUpdate("brand_name", val)}
-            classNames={{ inputWrapper: "h-9" }}
+            classNames={{
+              inputWrapper: "h-9 rounded-xl border-divider bg-content2/40",
+              input: "text-xs font-medium",
+            }}
           />
         </div>
-
-        {/* Collapsible Attributes Accordion */}
-        <Accordion className="px-0" variant="splitted">
-          <AccordionItem
-            key="attributes"
-            aria-label="Detailed Specifications"
-            title={
-              <div className="flex items-center gap-1.5 text-xs font-medium text-default-700">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-default-500" />
-                <span>Product Attributes & Specs</span>
-                <span className="text-[10px] text-default-400 font-normal">(Fit, Fabric, Neck, Sleeve, Pattern)</span>
-              </div>
-            }
-            className="border border-divider/60 shadow-none px-3 py-1 bg-default-50/50 dark:bg-default-100/10 rounded-lg"
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 pb-2">
-              {/* Fit */}
-              <div>
-                <label className="text-[11px] font-medium text-default-600 block mb-1">Fit Type</label>
-                <div className="flex flex-wrap gap-1">
-                  {FITS.map((fit) => (
-                    <button
-                      key={fit}
-                      type="button"
-                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                        brief.fit === fit
-                          ? "bg-primary text-white border-primary"
-                          : "border-divider text-default-600 hover:border-default-400"
-                      }`}
-                      onClick={() => handleUpdate("fit", brief.fit === fit ? undefined : fit)}
-                    >
-                      {fit}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Fabric */}
-              <div>
-                <label className="text-[11px] font-medium text-default-600 block mb-1">Fabric</label>
-                <div className="flex flex-wrap gap-1">
-                  {FABRICS.map((fab) => (
-                    <button
-                      key={fab}
-                      type="button"
-                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                        brief.fabric === fab
-                          ? "bg-primary text-white border-primary"
-                          : "border-divider text-default-600 hover:border-default-400"
-                      }`}
-                      onClick={() => handleUpdate("fabric", brief.fabric === fab ? undefined : fab)}
-                    >
-                      {fab}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Neck */}
-              <div>
-                <label className="text-[11px] font-medium text-default-600 block mb-1">Neck Style</label>
-                <div className="flex flex-wrap gap-1">
-                  {NECKS.map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                        brief.neck === n
-                          ? "bg-primary text-white border-primary"
-                          : "border-divider text-default-600 hover:border-default-400"
-                      }`}
-                      onClick={() => handleUpdate("neck", brief.neck === n ? undefined : n)}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Sleeve */}
-              <div>
-                <label className="text-[11px] font-medium text-default-600 block mb-1">Sleeve</label>
-                <div className="flex flex-wrap gap-1">
-                  {SLEEVES.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                        brief.sleeve === s
-                          ? "bg-primary text-white border-primary"
-                          : "border-divider text-default-600 hover:border-default-400"
-                      }`}
-                      onClick={() => handleUpdate("sleeve", brief.sleeve === s ? undefined : s)}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Pattern */}
-              <div>
-                <label className="text-[11px] font-medium text-default-600 block mb-1">Pattern</label>
-                <div className="flex flex-wrap gap-1">
-                  {PATTERNS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                        brief.pattern === p
-                          ? "bg-primary text-white border-primary"
-                          : "border-divider text-default-600 hover:border-default-400"
-                      }`}
-                      onClick={() => handleUpdate("pattern", brief.pattern === p ? undefined : p)}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Pack */}
-              <div>
-                <label className="text-[11px] font-medium text-default-600 block mb-1">Pack Quantity</label>
-                <div className="flex flex-wrap gap-1">
-                  {PACKS.map((pk) => (
-                    <button
-                      key={pk}
-                      type="button"
-                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                        brief.pack === pk
-                          ? "bg-primary text-white border-primary"
-                          : "border-divider text-default-600 hover:border-default-400"
-                      }`}
-                      onClick={() => handleUpdate("pack", brief.pack === pk ? undefined : pk)}
-                    >
-                      {pk}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price Band */}
-              <div className="sm:col-span-2">
-                <label className="text-[11px] font-medium text-default-600 block mb-1">
-                  Target Price Band (₹ INR)
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    size="sm"
-                    type="number"
-                    placeholder="Min (e.g. 499)"
-                    value={brief.price_min ? String(brief.price_min) : ""}
-                    onValueChange={(val) => handleUpdate("price_min", val ? Number(val) : null)}
-                    classNames={{ inputWrapper: "h-8 text-xs" }}
-                  />
-                  <span className="text-xs text-default-400">to</span>
-                  <Input
-                    size="sm"
-                    type="number"
-                    placeholder="Max (e.g. 999)"
-                    value={brief.price_max ? String(brief.price_max) : ""}
-                    onValueChange={(val) => handleUpdate("price_max", val ? Number(val) : null)}
-                    classNames={{ inputWrapper: "h-8 text-xs" }}
-                  />
-                </div>
-              </div>
-
-              {/* Extra Details */}
-              <div className="sm:col-span-2">
-                <label className="text-[11px] font-medium text-default-600 block mb-1">
-                  Unique Features / Notes for AI
-                </label>
-                <Textarea
-                  size="sm"
-                  minRows={2}
-                  placeholder="e.g. High-density puff print, 220 GSM bio-washed cotton, gym and streetwear crossover"
-                  value={brief.extra_details || ""}
-                  onValueChange={(val) => handleUpdate("extra_details", val)}
-                  classNames={{ input: "text-xs" }}
-                />
-              </div>
-            </div>
-          </AccordionItem>
-        </Accordion>
-
-        {/* Submit or Key Configuration Warning */}
-        <div className="pt-2">
-          {!isKeyConfigured ? (
-            <div className="flex flex-col gap-2 p-3 rounded-lg border border-warning/40 bg-warning/5 text-warning-700 dark:text-warning-300">
-              <span className="text-xs font-medium">OpenRouter API Key Required (BYOK)</span>
-              <p className="text-[11px] leading-relaxed text-default-500">
-                You need to set your own OpenRouter key once. Keys are encrypted at rest with Fernet AES and never shared.
-              </p>
-              <Button
-                size="sm"
-                color="warning"
-                variant="flat"
-                className="font-semibold text-xs h-8"
-                onPress={onOpenKeyModal}
-              >
-                Configure OpenRouter Key
-              </Button>
-            </div>
-          ) : (
-            <Button
-              color="primary"
-              size="md"
-              className="w-full font-semibold text-sm shadow-md h-10 gap-2"
-              isDisabled={!isFormValid || isLoading}
-              isLoading={isLoading}
-              onPress={onSubmit}
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>{isLoading ? "Running Keyword Agent..." : "Generate Strategy & Titles"}</span>
-            </Button>
-          )}
+        <div>
+          <label className="text-xs font-semibold text-foreground block mb-1">Min Price (₹)</label>
+          <Input
+            size="sm"
+            type="number"
+            aria-label="Min Price (₹)"
+            placeholder="599"
+            value={brief.price_min ? String(brief.price_min) : ""}
+            onValueChange={(val) => handleUpdate("price_min", val ? Number(val) : null)}
+            classNames={{
+              inputWrapper: "h-9 rounded-xl border-divider bg-content2/40",
+              input: "text-xs font-medium",
+            }}
+          />
         </div>
-      </CardBody>
-    </Card>
+        <div>
+          <label className="text-xs font-semibold text-foreground block mb-1">Max Price (₹)</label>
+          <Input
+            size="sm"
+            type="number"
+            aria-label="Max Price (₹)"
+            placeholder="999"
+            value={brief.price_max ? String(brief.price_max) : ""}
+            onValueChange={(val) => handleUpdate("price_max", val ? Number(val) : null)}
+            classNames={{
+              inputWrapper: "h-9 rounded-xl border-divider bg-content2/40",
+              input: "text-xs font-medium",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Section 6: Specific Aesthetic / Design Details */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-foreground block">
+          Special Aesthetic or Graphics Note
+        </label>
+        <Textarea
+          minRows={2}
+          maxRows={4}
+          aria-label="Special Aesthetic or Graphics Note"
+          placeholder="e.g. Heavyweight 240 GSM drop shoulder streetwear tee with Japanese anime back print"
+          value={brief.extra_details || ""}
+          onValueChange={(val) => handleUpdate("extra_details", val)}
+          classNames={{
+            inputWrapper: "rounded-xl border-divider bg-content2/40 p-3",
+            input: "text-xs font-medium",
+          }}
+        />
+      </div>
+
+      {/* Collapsible Advanced Attribute Specifications */}
+      <Accordion isCompact variant="bordered" className="border border-divider/60 rounded-xl px-2">
+        <AccordionItem
+          key="advanced"
+          aria-label="Advanced Garment Attributes"
+          title={
+            <div className="flex items-center gap-2 text-xs font-bold text-default-600">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-primary" />
+              <span>Optional Attributes (Fabric, Neck, Sleeve, Pattern)</span>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-3 pt-1">
+            <div>
+              <label className="text-[11px] font-semibold text-foreground block mb-1">Fabric</label>
+              <div className="flex flex-wrap gap-1">
+                {FABRICS.map((f) => (
+                  <Chip
+                    key={f}
+                    size="sm"
+                    variant={brief.fabric === f ? "solid" : "bordered"}
+                    color={brief.fabric === f ? "primary" : "default"}
+                    className="cursor-pointer text-[11px]"
+                    onClick={() => handleUpdate("fabric", brief.fabric === f ? null : f)}
+                  >
+                    {f}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-foreground block mb-1">Neck Style</label>
+              <div className="flex flex-wrap gap-1">
+                {NECKS.map((n) => (
+                  <Chip
+                    key={n}
+                    size="sm"
+                    variant={brief.neck === n ? "solid" : "bordered"}
+                    color={brief.neck === n ? "primary" : "default"}
+                    className="cursor-pointer text-[11px]"
+                    onClick={() => handleUpdate("neck", brief.neck === n ? null : n)}
+                  >
+                    {n}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-foreground block mb-1">Sleeve</label>
+              <div className="flex flex-wrap gap-1">
+                {SLEEVES.map((s) => (
+                  <Chip
+                    key={s}
+                    size="sm"
+                    variant={brief.sleeve === s ? "solid" : "bordered"}
+                    color={brief.sleeve === s ? "primary" : "default"}
+                    className="cursor-pointer text-[11px]"
+                    onClick={() => handleUpdate("sleeve", brief.sleeve === s ? null : s)}
+                  >
+                    {s}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-foreground block mb-1">Pattern</label>
+              <div className="flex flex-wrap gap-1">
+                {PATTERNS.map((p) => (
+                  <Chip
+                    key={p}
+                    size="sm"
+                    variant={brief.pattern === p ? "solid" : "bordered"}
+                    color={brief.pattern === p ? "primary" : "default"}
+                    className="cursor-pointer text-[11px]"
+                    onClick={() => handleUpdate("pattern", brief.pattern === p ? null : p)}
+                  >
+                    {p}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          </div>
+        </AccordionItem>
+      </Accordion>
+
+      {/* Submit Action CTA */}
+      <div className="flex items-center justify-between pt-2 border-t border-divider/60 flex-wrap gap-3">
+        <span className="text-xs text-default-400">
+          Targeting {brief.platforms.length} marketplaces with Bayesian rating scraping.
+        </span>
+
+        <Button
+          size="md"
+          color="primary"
+          variant="solid"
+          isLoading={isLoading}
+          isDisabled={!isFormValid || isLoading}
+          onPress={onSubmit}
+          className="px-6 rounded-xl font-bold text-xs shadow-md shadow-primary/20"
+          startContent={!isLoading && <Sparkles className="w-4 h-4 text-indigo-200" />}
+        >
+          {isLoading ? "Running Research Pipeline..." : "Start Market Research"}
+        </Button>
+      </div>
+    </div>
   );
 };

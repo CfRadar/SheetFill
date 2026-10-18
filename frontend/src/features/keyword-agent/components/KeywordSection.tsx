@@ -61,6 +61,7 @@ export const KeywordSection: React.FC<Props> = ({ keywords, platformTitle }) => 
         <div className="flex items-center gap-2">
           <Input
             size="sm"
+            aria-label="Filter keywords"
             placeholder="Filter keywords..."
             startContent={<Search className="w-3.5 h-3.5 text-default-400" />}
             value={filterText}

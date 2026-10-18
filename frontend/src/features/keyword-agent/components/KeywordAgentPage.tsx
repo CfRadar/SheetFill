@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Button,
   Chip,
@@ -21,52 +21,41 @@ import { ProgressSteps } from "./ProgressSteps";
 import { ResultsPanel } from "./ResultsPanel";
 import { KeySettingsModal } from "./KeySettingsModal";
 import { SystemCheckModal } from "./SystemCheckModal";
-import { getKeyStatus, createRun, cancelRun, getRun, connectSSE } from "../api";
+import { getKeyStatus, createRun, getRun } from "../api";
+import { sseManager } from "../service/sseManager";
+import { useAppStore } from "../../../store";
 import type { ProductBrief, RunResult, KeyStatus, SSEEvent } from "../types";
 
-const DEFAULT_BRIEF: ProductBrief = {
-  platforms: ["amazon", "flipkart", "myntra", "meesho"],
-  tshirt_type: "Oversized T-Shirt",
-  color: "Black",
-  gender: "men",
-  fit: "Oversized",
-  fabric: "100% Cotton",
-  neck: "Round Neck",
-  sleeve: "Half Sleeve",
-  pattern: "Graphic Print",
-  brand_name: "UrbanStyle",
-  pack: "Single",
-  price_min: 599,
-  price_max: 999,
-  extra_details: "Streetwear aesthetic with anime back print, heavyweight 240 GSM drop shoulder",
-  research_sources: ["amazon", "flipkart", "myntra", "meesho", "google", "reddit"],
-};
-
 export const KeywordAgentPage: React.FC = () => {
-  const [brief, setBrief] = useState<ProductBrief>(DEFAULT_BRIEF);
+  const {
+    brief,
+    updateBrief,
+    currentRunId,
+    runStatus,
+    currentStage,
+    events,
+    result,
+    errorMsg,
+    setKeywordAgentState,
+    appendKeywordEvent,
+    resetKeywordAgent,
+  } = useAppStore();
+
   const [keyStatus, setKeyStatus] = useState<KeyStatus | null>(null);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [isPreflightModalOpen, setIsPreflightModalOpen] = useState(false);
 
-  // Run lifecycle state
-  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const [currentStage, setCurrentStage] = useState<SSEEvent["stage"]>(null);
-  const [events, setEvents] = useState<SSEEvent[]>([]);
-  const [result, setResult] = useState<RunResult | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const cleanupSSE = useRef<(() => void) | null>(null);
-
   // Load key status on mount
   useEffect(() => {
     loadKeyStatus();
-    return () => {
-      if (cleanupSSE.current) {
-        cleanupSSE.current();
-      }
-    };
   }, []);
+
+  // Resume listener if run was in-progress when page loaded
+  useEffect(() => {
+    if (runStatus === "running" && currentRunId && !sseManager.isStreaming(currentRunId)) {
+      attachStream(currentRunId);
+    }
+  }, [runStatus, currentRunId]);
 
   const loadKeyStatus = async () => {
     try {
@@ -77,74 +66,81 @@ export const KeywordAgentPage: React.FC = () => {
     }
   };
 
+  const attachStream = (runId: string) => {
+    sseManager.startStream(
+      runId,
+      (ev: SSEEvent) => {
+        appendKeywordEvent(ev);
+        if (ev.type === "result" && ev.data) {
+          setKeywordAgentState({ result: ev.data, runStatus: "success" });
+        } else if (ev.type === "done") {
+          setKeywordAgentState({ runStatus: "success" });
+          getRun(runId)
+            .then((r) => {
+              if (r.result) setKeywordAgentState({ result: r.result });
+            })
+            .catch(console.warn);
+        } else if (ev.type === "error") {
+          setKeywordAgentState({
+            runStatus: "error",
+            errorMsg: ev.message || "Run encountered an unexpected error.",
+          });
+        }
+      },
+      (err: any) => {
+        console.error("SSE connection error:", err);
+        getRun(runId)
+          .then((r) => {
+            if (r.result) {
+              setKeywordAgentState({ result: r.result, runStatus: "success" });
+            } else {
+              setKeywordAgentState({
+                runStatus: "error",
+                errorMsg: "Lost connection to real-time event stream.",
+              });
+            }
+          })
+          .catch(() => {
+            setKeywordAgentState({
+              runStatus: "error",
+              errorMsg: "Lost connection to real-time event stream.",
+            });
+          });
+      },
+      () => {
+        // onDone
+      }
+    );
+  };
+
   const handleStartRun = async () => {
     if (!keyStatus?.configured) {
       setIsKeyModalOpen(true);
       return;
     }
 
-    setIsRunning(true);
-    setErrorMsg(null);
-    setResult(null);
-    setEvents([]);
-    setCurrentStage("planner");
+    setKeywordAgentState({
+      runStatus: "running",
+      errorMsg: null,
+      result: null,
+      events: [],
+      currentStage: "planner",
+    });
 
     try {
       const runResp = await createRun(brief);
       const runId = runResp.run_id;
-      setCurrentRunId(runId);
+      setKeywordAgentState({ currentRunId: runId });
 
-      // Start listening to SSE stream
-      const unsub = connectSSE(
-        runId,
-        (ev: SSEEvent) => {
-          setEvents((prev) => [...prev, ev]);
-          if (ev.stage) {
-            setCurrentStage(ev.stage);
-          }
-          if (ev.type === "result" && ev.data) {
-            setResult(ev.data);
-            setIsRunning(false);
-          }
-          if (ev.type === "done") {
-            setIsRunning(false);
-            // Fetch final result if not already populated
-            getRun(runId)
-              .then((r) => {
-                if (r.result) setResult(r.result);
-              })
-              .catch(console.warn);
-          }
-          if (ev.type === "error") {
-            setIsRunning(false);
-            setErrorMsg(ev.message || "Run encountered an unexpected error.");
-          }
-        },
-        (err: any) => {
-          console.error("SSE connection error:", err);
-          // If SSE dropped, attempt to poll the run status
-          getRun(runId)
-            .then((r) => {
-              if (r.result) {
-                setResult(r.result);
-                setIsRunning(false);
-              }
-            })
-            .catch(() => {
-              setIsRunning(false);
-              setErrorMsg("Lost connection to real-time event stream.");
-            });
-        }
-      );
-
-      cleanupSSE.current = unsub;
+      // Start stream via persistent sseManager
+      attachStream(runId);
     } catch (err: any) {
-      setIsRunning(false);
+      setKeywordAgentState({ runStatus: "idle" });
       if (err?.code === "OPENROUTER_KEY_MISSING") {
-        setErrorMsg("Please configure your OpenRouter API key first.");
+        setKeywordAgentState({ errorMsg: "Please configure your OpenRouter API key first." });
         setIsKeyModalOpen(true);
       } else {
-        setErrorMsg(err?.message || "Failed to start keyword agent run.");
+        setKeywordAgentState({ errorMsg: err?.message || "Failed to start keyword agent run." });
       }
     }
   };
@@ -152,249 +148,158 @@ export const KeywordAgentPage: React.FC = () => {
   const handleCancelRun = async () => {
     if (!currentRunId) return;
     try {
-      await cancelRun(currentRunId);
+      await sseManager.cancelAndStop(currentRunId);
     } catch (e) {
       console.warn("Could not cancel run:", e);
     } finally {
-      if (cleanupSSE.current) {
-        cleanupSSE.current();
-      }
-      setIsRunning(false);
-      setErrorMsg("Run cancelled by user.");
+      setKeywordAgentState({
+        runStatus: "cancelled",
+        errorMsg: "Run cancelled by user.",
+      });
     }
   };
 
   const handleReset = () => {
-    if (cleanupSSE.current) {
-      cleanupSSE.current();
+    if (currentRunId) {
+      sseManager.stopStream();
     }
-    setIsRunning(false);
-    setCurrentRunId(null);
-    setResult(null);
-    setEvents([]);
-    setErrorMsg(null);
+    resetKeywordAgent();
   };
+
+  const isRunning = runStatus === "running";
 
   return (
     <div className="flex-1 flex flex-col p-4 sm:p-6 max-w-7xl mx-auto w-full gap-5">
       {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-divider/70">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
-              Marketplace Keyword Agent
-            </h1>
-            <Chip
-              size="sm"
-              variant="flat"
-              color="primary"
-              className="text-[10px] font-semibold h-5 uppercase tracking-wider"
-            >
-              Multi-Agent AI
-            </Chip>
-          </div>
-          <p className="text-xs text-default-500">
-            Automated keyword discovery, competitor scraping & deterministic title generation across Amazon, Flipkart, Myntra, and Meesho.
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-divider">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Marketplace Keyword Agent
+          </h1>
+          <p className="text-xs text-default-500 mt-0.5">
+            AI-driven competitive keyword research & high-conversion title composer across Amazon, Flipkart, Myntra, and Meesho
           </p>
         </div>
 
-        {/* Action Controls: BYOK Status, Key Modal, Preflight */}
-        <div className="flex items-center gap-2">
-          {keyStatus?.configured ? (
-            <Chip
-              size="sm"
-              variant="flat"
-              color="success"
-              className="h-7 text-xs font-mono font-medium gap-1 cursor-pointer"
-              onClick={() => setIsKeyModalOpen(true)}
-            >
-              <span className="text-[10px] opacity-75">KEY:</span> ••••{keyStatus.last4}
-            </Chip>
-          ) : (
-            <Chip
-              size="sm"
-              variant="flat"
-              color="warning"
-              className="h-7 text-xs font-semibold gap-1 cursor-pointer"
-              onClick={() => setIsKeyModalOpen(true)}
-            >
-              No Key Configured
-            </Chip>
-          )}
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="flat"
+            color="default"
+            onPress={() => setIsPreflightModalOpen(true)}
+            className="text-xs h-8"
+            startContent={<ShieldCheck className="w-3.5 h-3.5 text-default-500" />}
+          >
+            Diagnostics
+          </Button>
 
           <Button
             size="sm"
             variant="flat"
-            className="h-8 text-xs font-medium gap-1.5"
+            color={keyStatus?.configured ? "success" : "warning"}
             onPress={() => setIsKeyModalOpen(true)}
+            className="text-xs font-medium h-8"
+            startContent={<Key className="w-3.5 h-3.5" />}
           >
-            <Key className="w-3.5 h-3.5 text-primary" />
-            <span>OpenRouter Key</span>
+            {keyStatus?.configured ? `OpenRouter Key (...${keyStatus.last4})` : "Configure BYOK Key"}
           </Button>
 
-          <Button
-            size="sm"
-            variant="light"
-            className="h-8 text-xs font-medium gap-1.5 text-default-500 hover:text-foreground"
-            onPress={() => setIsPreflightModalOpen(true)}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-secondary" />
-            <span>Preflight</span>
-          </Button>
+          {(result || events.length > 0) && (
+            <Button
+              size="sm"
+              variant="light"
+              color="default"
+              onPress={handleReset}
+              className="text-xs h-8 text-default-600"
+              startContent={<RotateCcw className="w-3.5 h-3.5" />}
+            >
+              New Research
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Main Workspace Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left Form: Sticky Product Brief */}
-        <div className="lg:col-span-5 flex flex-col gap-3">
+      {/* Main Content Area */}
+      <div className="flex flex-col gap-6">
+        {/* Step 1: Input Brief Form (Always visible or in edit mode) */}
+        {!result && (
           <BriefForm
             brief={brief}
-            onChange={setBrief}
+            onChange={(next) => updateBrief(next)}
             onSubmit={handleStartRun}
             isLoading={isRunning}
             isKeyConfigured={Boolean(keyStatus?.configured)}
             onOpenKeyModal={() => setIsKeyModalOpen(true)}
           />
-        </div>
+        )}
 
-        {/* Right Output: Empty State, Live Progress Steps, or Results Panel */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
-          {/* Error Banner */}
-          {errorMsg && (
-            <Card className="border border-danger-200 bg-danger-50 dark:bg-danger-950/20 text-danger shadow-xs">
-              <CardBody className="p-3.5 flex items-start gap-2.5 text-xs">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="flex-1 flex flex-col gap-1">
-                  <span className="font-semibold">Generation Notice</span>
-                  <span>{errorMsg}</span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="light"
-                  color="danger"
-                  className="h-6 text-[11px] px-2"
-                  onPress={handleReset}
-                >
-                  Dismiss
-                </Button>
-              </CardBody>
-            </Card>
-          )}
-
-          {/* 1. Live Running Progress */}
-          {isRunning && (
-            <ProgressSteps
-              currentStage={currentStage}
-              events={events}
-              onCancel={handleCancelRun}
-            />
-          )}
-
-          {/* 2. Completed Results */}
-          {!isRunning && result && (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-default-400">
-                  Run ID: <code className="font-mono text-default-600">{result.run_id}</code>
-                </span>
-                <Button
-                  size="sm"
-                  variant="light"
-                  className="h-7 text-xs text-default-500 gap-1"
-                  onPress={handleReset}
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Start New Run</span>
-                </Button>
-              </div>
-              <ResultsPanel result={result} briefSummary={brief.tshirt_type} />
+        {/* Error Banner */}
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger border border-danger-200 dark:border-danger-800 text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
             </div>
-          )}
+            {!keyStatus?.configured && (
+              <Button
+                size="sm"
+                color="danger"
+                variant="flat"
+                className="h-7 text-xs"
+                onPress={() => setIsKeyModalOpen(true)}
+              >
+                Set Key
+              </Button>
+            )}
+          </div>
+        )}
 
-          {/* 3. Idle / Welcome State */}
-          {!isRunning && !result && (
-            <Card className="border border-divider/70 bg-content1 shadow-xs">
-              <CardBody className="p-6 sm:p-8 flex flex-col gap-6">
-                <div className="flex flex-col gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-base font-bold text-foreground tracking-tight">
-                    Welcome to Marketplace Keyword Agent
-                  </h3>
-                  <p className="text-xs text-default-500 leading-relaxed max-w-xl">
-                    Fill out the product brief on the left and select your target platforms. The multi-agent pipeline will scrape competitor benchmarks, score keywords using mathematical rankings, and construct strictly compliant titles.
-                  </p>
-                </div>
+        {/* Step 2: Live Progress & Execution Stepper */}
+        {isRunning && (
+          <ProgressSteps
+            stage={currentStage}
+            events={events}
+            onCancel={handleCancelRun}
+          />
+        )}
 
-                {/* 3 Feature Highlights */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="p-3 rounded-lg border border-divider/60 bg-default-50/50 dark:bg-default-900/20 flex flex-col gap-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <ShoppingBag className="w-3.5 h-3.5 text-primary" />
-                      <span>Live Marketplace Intel</span>
-                    </div>
-                    <p className="text-[11px] text-default-500 leading-normal">
-                      Pulls live autocomplete suggestions and competitor title patterns across Amazon, Flipkart, Myntra, and Meesho.
-                    </p>
-                  </div>
+        {/* Step 3: Comprehensive Multi-Platform Results */}
+        {result && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Chip size="sm" color="success" variant="flat" className="font-semibold text-xs">
+                  Research Completed
+                </Chip>
+                <span className="text-xs text-default-500 font-mono">Run: {currentRunId}</span>
+              </div>
 
-                  <div className="p-3 rounded-lg border border-divider/60 bg-default-50/50 dark:bg-default-900/20 flex flex-col gap-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <Cpu className="w-3.5 h-3.5 text-secondary" />
-                      <span>Deterministic Formulas</span>
-                    </div>
-                    <p className="text-[11px] text-default-500 leading-normal">
-                      Platform rules from rules.yaml compose titles safely. Character limits and banned claim whitelists are enforced automatically.
-                    </p>
-                  </div>
+              <Button
+                size="sm"
+                variant="flat"
+                color="primary"
+                onPress={handleReset}
+                startContent={<RotateCcw className="w-3.5 h-3.5" />}
+                className="text-xs h-8"
+              >
+                Start Fresh Run
+              </Button>
+            </div>
 
-                  <div className="p-3 rounded-lg border border-divider/60 bg-default-50/50 dark:bg-default-900/20 flex flex-col gap-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <Zap className="w-3.5 h-3.5 text-success" />
-                      <span>Zero Master Key (BYOK)</span>
-                    </div>
-                    <p className="text-[11px] text-default-500 leading-normal">
-                      Every user uses their own OpenRouter key. Keys are encrypted at rest with Fernet AES and never exposed in responses or logs.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Quick Start Prompt */}
-                <div className="p-3.5 rounded-lg bg-primary-50/50 dark:bg-primary-950/20 border border-primary-200/50 dark:border-primary-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-semibold text-primary">
-                      Ready to generate your first listing package?
-                    </span>
-                    <span className="text-[11px] text-default-500">
-                      Click the "Generate Strategy & Titles" button or pick a preset brief above.
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    color="primary"
-                    className="font-semibold text-xs h-8 shrink-0"
-                    onPress={handleStartRun}
-                  >
-                    Run Sample Brief
-                  </Button>
-                </div>
-              </CardBody>
-            </Card>
-          )}
-        </div>
+            <ResultsPanel result={result} briefSummary={`${brief.gender} ${brief.tshirt_type} (${brief.color})`} />
+          </div>
+        )}
       </div>
 
-      {/* Modals */}
+      {/* BYOK Settings Modal */}
       <KeySettingsModal
         isOpen={isKeyModalOpen}
         onClose={() => setIsKeyModalOpen(false)}
-        onKeyUpdated={(status) => {
-          setKeyStatus(status);
-        }}
+        onKeyUpdated={(stat) => setKeyStatus(stat)}
       />
 
+      {/* System Preflight Diagnostics Modal */}
       <SystemCheckModal
         isOpen={isPreflightModalOpen}
         onClose={() => setIsPreflightModalOpen(false)}

@@ -55,16 +55,20 @@ export const AuthGate: React.FC<Props> = ({ children }) => {
       ? "Marketplace Keyword Agent"
       : "Flipkart Sheet Filler";
 
-  // 3. Render section based on activeSection
+  // 3. Render views with persistent DOM mounting so tab switching preserves scroll & input state
   return (
     <AppShell title={title}>
-      {activeSection === "admin" && user.role === "admin" ? (
-        <AdminDashboard />
-      ) : activeSection === "keyword-agent" ? (
-        <KeywordAgentPage />
-      ) : (
-        children
+      {user.role === "admin" && (
+        <div className={activeSection === "admin" ? "w-full flex-1 flex flex-col" : "hidden"}>
+          <AdminDashboard />
+        </div>
       )}
+      <div className={activeSection === "keyword-agent" ? "w-full flex-1 flex flex-col" : "hidden"}>
+        <KeywordAgentPage />
+      </div>
+      <div className={activeSection === "sheets" ? "w-full flex-1 flex flex-col" : "hidden"}>
+        {children}
+      </div>
     </AppShell>
   );
 };

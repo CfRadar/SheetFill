@@ -124,6 +124,7 @@ export const RefineBox: React.FC<Props> = ({ runId }) => {
         <div className="flex items-center gap-2">
           <Input
             size="sm"
+            aria-label="Adjustment prompt"
             placeholder="Type an adjustment (e.g. 'Add 100% Cotton to Amazon title')..."
             value={inputText}
             onValueChange={setInputText}

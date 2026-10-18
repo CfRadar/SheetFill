@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
-import { Card, CardHeader, CardBody, Chip, Progress, Alert } from "@heroui/react";
-import { UploadCloud, FileSpreadsheet, ShieldCheck, Layers, Sparkles } from "lucide-react";
+import { Chip, Progress, Alert } from "@heroui/react";
+import { UploadCloud, FileSpreadsheet } from "lucide-react";
 import { uploadSheet } from "../api";
 import { useAppStore } from "../store";
 import { toast } from "../ui/ToastProvider";
@@ -107,143 +107,120 @@ export const UploadStep: React.FC = () => {
   };
 
   return (
-    <PageFade className="w-full max-w-xl mx-auto py-10 sm:py-16 px-4">
-      <Card shadow="sm" className="border border-divider/80 bg-content1/80 backdrop-blur-md relative overflow-hidden">
-        <CardHeader className="flex flex-col items-center text-center pb-2 pt-6 px-6">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary/20 via-primary/10 to-indigo-500/20 text-primary flex items-center justify-center mb-3 shadow-inner border border-primary/20">
-            <UploadCloud className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Upload Flipkart Workbook</h2>
-          <p className="text-sm text-default-500 mt-1 max-w-sm">
-            Drop your listing template (.xlsm or .xls) to auto-fill designs
-          </p>
+    <PageFade className="w-full max-w-2xl mx-auto py-12 sm:py-20 px-4 flex flex-col items-center">
+      {/* Hero Header */}
+      <div className="flex flex-col items-center text-center mb-8 max-w-lg">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary/20 via-primary/10 to-indigo-500/20 text-primary flex items-center justify-center mb-4 shadow-xs border border-primary/20">
+          <UploadCloud className="w-7 h-7" />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+          Upload Flipkart Listing Sheet
+        </h1>
+        <p className="text-sm text-default-500 mt-2 leading-relaxed">
+          Drop your .xlsm or .xls workbook to automatically extract and populate designs
+        </p>
+      </div>
 
-          {/* Feature Badges */}
-          <div className="flex items-center justify-center gap-2 mt-3 flex-wrap">
-            <Chip
-              size="sm"
-              variant="flat"
-              color="primary"
-              startContent={<Layers className="w-3 h-3 ml-1" />}
-              className="text-[11px] h-6 font-medium"
-            >
-              4 S-XL rows / design
-            </Chip>
-            <Chip
-              size="sm"
-              variant="flat"
-              color="success"
-              startContent={<ShieldCheck className="w-3 h-3 ml-1" />}
-              className="text-[11px] h-6 font-medium"
-            >
-              Macro-safe preserve
-            </Chip>
-            <Chip
-              size="sm"
-              variant="flat"
-              color="default"
-              startContent={<Sparkles className="w-3 h-3 ml-1" />}
-              className="text-[11px] h-6 font-medium text-default-500"
-            >
-              Max 25 MB
-            </Chip>
-          </div>
-        </CardHeader>
+      {/* Error Alert */}
+      {error && (
+        <div className="w-full mb-5">
+          <Alert
+            color="danger"
+            variant="flat"
+            title="Upload failed"
+            description={error}
+            isClosable
+            onClose={() => setError(null)}
+          />
+        </div>
+      )}
 
-        <CardBody className="px-6 pb-6 pt-3 flex flex-col gap-4">
-          {error && (
-            <Alert
-              color="danger"
-              variant="flat"
-              title="Upload failed"
-              description={error}
-              isClosable
-              onClose={() => setError(null)}
-            />
-          )}
+      {/* Hero Dropzone Container */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Upload Excel workbook dropzone"
+        onClick={handleDropzoneClick}
+        onKeyDown={handleKeyDown}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`w-full min-h-[320px] sm:min-h-[360px] relative border-2 border-dashed rounded-3xl p-8 sm:p-14 text-center cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 select-none overflow-hidden flex flex-col items-center justify-center bg-content1/80 backdrop-blur-md shadow-sm ${
+          isDragging
+            ? "border-primary bg-primary-50/50 dark:bg-primary-950/30 scale-[1.01]"
+            : "border-divider/90 hover:border-primary/60 dark:border-divider/70 dark:hover:border-primary/50 hover:bg-content2/50"
+        }`}
+      >
+        {/* Antigravity floating particles canvas */}
+        <AntigravityCanvas isInteracting={isDragging} />
 
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label="Upload Excel workbook dropzone"
-            onClick={handleDropzoneClick}
-            onKeyDown={handleKeyDown}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`relative border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 select-none overflow-hidden ${
-              isDragging
-                ? "border-primary bg-primary-50/60 dark:bg-primary-950/30 scale-[1.01]"
-                : "border-default-300 hover:border-primary/60 dark:border-default-700 dark:hover:border-primary/50 bg-default-50/40 hover:bg-default-100/50"
-            }`}
-          >
-            {/* Antigravity floating particles canvas */}
-            <AntigravityCanvas isInteracting={isDragging} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xls,.xlsm,.xlsx"
+          onChange={handleFileInputChange}
+          className="sr-only"
+          tabIndex={-1}
+          disabled={loading}
+        />
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xls,.xlsm,.xlsx"
-              onChange={handleFileInputChange}
-              className="sr-only"
-              tabIndex={-1}
-              disabled={loading}
-            />
-
-            <div className="relative z-10">
-              {loading ? (
-                <div className="flex flex-col items-center justify-center gap-3">
-                  {selectedFile && (
-                    <Chip
-                      variant="flat"
-                      color="primary"
-                      startContent={<FileSpreadsheet className="w-4 h-4 ml-1" />}
-                      className="max-w-full truncate"
-                    >
-                      {selectedFile.name} ({formatBytes(selectedFile.size)})
-                    </Chip>
-                  )}
-                  <Progress
-                    size="sm"
-                    isIndeterminate
-                    color="primary"
-                    aria-label="Analyzing workbook"
-                    label="Analyzing workbook structure and detecting designs..."
-                    className="max-w-md w-full mt-2"
-                  />
-                </div>
-              ) : selectedFile ? (
-                <div className="flex flex-col items-center gap-2">
-                  <Chip
-                    variant="flat"
-                    color="primary"
-                    startContent={<FileSpreadsheet className="w-4 h-4 ml-1" />}
-                    onClose={handleClearFile}
-                    className="max-w-full truncate"
-                  >
-                    {selectedFile.name} ({formatBytes(selectedFile.size)})
-                  </Chip>
-                  <p className="text-xs text-default-400 mt-2">
-                    Click or drag another file to replace
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center">
-                  <div className="w-14 h-14 rounded-2xl bg-content2/80 border border-divider flex items-center justify-center mb-3 shadow-xs">
-                    <FileSpreadsheet className="w-7 h-7 text-primary" />
-                  </div>
-                  <p className="text-sm font-semibold text-foreground">
-                    Choose workbook or drag & drop here
-                  </p>
-                  <p className="text-xs text-default-400 mt-1">
-                    Supports Flipkart .xlsm and .xls listing workbooks
-                  </p>
-                </div>
+        <div className="relative z-10 flex flex-col items-center max-w-md">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center gap-3 w-full">
+              {selectedFile && (
+                <Chip
+                  variant="flat"
+                  color="primary"
+                  startContent={<FileSpreadsheet className="w-4 h-4 ml-1" />}
+                  className="max-w-full truncate"
+                >
+                  {selectedFile.name} ({formatBytes(selectedFile.size)})
+                </Chip>
               )}
+              <Progress
+                size="sm"
+                isIndeterminate
+                color="primary"
+                aria-label="Analyzing workbook"
+                label="Analyzing workbook structure and detecting designs..."
+                className="w-full max-w-sm mt-3"
+              />
             </div>
-          </div>
-        </CardBody>
-      </Card>
+          ) : selectedFile ? (
+            <div className="flex flex-col items-center gap-2">
+              <Chip
+                variant="flat"
+                color="primary"
+                startContent={<FileSpreadsheet className="w-4 h-4 ml-1" />}
+                onClose={handleClearFile}
+                className="max-w-full truncate text-xs font-semibold"
+              >
+                {selectedFile.name} ({formatBytes(selectedFile.size)})
+              </Chip>
+              <p className="text-xs text-default-400 mt-2">
+                Click or drag another file to replace
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-2xl bg-content2/90 border border-divider/80 flex items-center justify-center mb-4 shadow-xs">
+                <FileSpreadsheet className="w-8 h-8 text-primary" />
+              </div>
+              <p className="text-base font-semibold text-foreground">
+                Choose workbook or drag & drop here
+              </p>
+              <p className="text-xs text-default-400 mt-1">
+                Click to browse files from your computer
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Single quiet capability line under the dropzone */}
+      <p className="text-xs text-default-400 mt-4 tracking-wide text-center">
+        Supports .xlsm & .xls · Macro-safe · Max 25 MB
+      </p>
     </PageFade>
   );
 };
