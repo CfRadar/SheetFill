@@ -1,5 +1,4 @@
 import React from "react";
-import { Chip } from "@heroui/react";
 import type { PlatformName } from "../types";
 
 interface Props {
@@ -7,17 +6,57 @@ interface Props {
   onChange: (platforms: PlatformName[]) => void;
 }
 
-const PLATFORMS: { id: PlatformName; label: string; color: "warning" | "primary" | "secondary" | "danger" }[] = [
-  { id: "amazon", label: "Amazon", color: "warning" },
-  { id: "flipkart", label: "Flipkart", color: "primary" },
-  { id: "myntra", label: "Myntra", color: "danger" },
-  { id: "meesho", label: "Meesho", color: "secondary" },
+const PLATFORMS: {
+  id: PlatformName;
+  label: string;
+  theme: { activeBg: string; activeText: string; activeBorder: string; dot: string };
+}[] = [
+  {
+    id: "amazon",
+    label: "Amazon",
+    theme: {
+      activeBg: "bg-amber-500/15 dark:bg-amber-500/25",
+      activeText: "text-amber-700 dark:text-amber-300 font-bold",
+      activeBorder: "border-amber-500/60 ring-1 ring-amber-500/40",
+      dot: "bg-amber-500",
+    },
+  },
+  {
+    id: "flipkart",
+    label: "Flipkart",
+    theme: {
+      activeBg: "bg-blue-500/15 dark:bg-blue-500/25",
+      activeText: "text-blue-700 dark:text-blue-300 font-bold",
+      activeBorder: "border-blue-500/60 ring-1 ring-blue-500/40",
+      dot: "bg-blue-500",
+    },
+  },
+  {
+    id: "myntra",
+    label: "Myntra",
+    theme: {
+      activeBg: "bg-rose-500/15 dark:bg-rose-500/25",
+      activeText: "text-rose-700 dark:text-rose-300 font-bold",
+      activeBorder: "border-rose-500/60 ring-1 ring-rose-500/40",
+      dot: "bg-rose-500",
+    },
+  },
+  {
+    id: "meesho",
+    label: "Meesho",
+    theme: {
+      activeBg: "bg-pink-500/15 dark:bg-pink-500/25",
+      activeText: "text-pink-700 dark:text-pink-300 font-bold",
+      activeBorder: "border-pink-500/60 ring-1 ring-pink-500/40",
+      dot: "bg-pink-500",
+    },
+  },
 ];
 
 export const PlatformPicker: React.FC<Props> = ({ selectedPlatforms, onChange }) => {
   const togglePlatform = (p: PlatformName) => {
     if (selectedPlatforms.includes(p)) {
-      if (selectedPlatforms.length === 1) return; // Keep at least one
+      if (selectedPlatforms.length === 1) return; // Keep at least one platform selected
       onChange(selectedPlatforms.filter((item) => item !== p));
     } else {
       onChange([...selectedPlatforms, p]);
@@ -25,26 +64,30 @@ export const PlatformPicker: React.FC<Props> = ({ selectedPlatforms, onChange })
   };
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <label className="text-xs font-semibold text-foreground flex items-center justify-between">
         <span>Target Marketplaces</span>
-        <span className="text-[11px] text-default-400 font-normal">Select 1 to 4</span>
+        <span className="text-[11px] text-default-400 font-normal">Select 1 to 4 platforms</span>
       </label>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2.5">
         {PLATFORMS.map((plat) => {
           const isSelected = selectedPlatforms.includes(plat.id);
+          const { activeBg, activeText, activeBorder, dot } = plat.theme;
+
           return (
-            <Chip
+            <button
               key={plat.id}
-              as="button"
               type="button"
-              variant={isSelected ? "solid" : "bordered"}
-              color={isSelected ? plat.color : "default"}
               onClick={() => togglePlatform(plat.id)}
-              className="cursor-pointer transition-transform hover:scale-[1.02] text-xs font-medium"
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border text-xs transition-all duration-150 select-none ${
+                isSelected
+                  ? `${activeBg} ${activeText} ${activeBorder} shadow-2xs`
+                  : "bg-content2/40 hover:bg-content2 text-default-600 border-divider hover:border-default-400"
+              }`}
             >
-              {plat.label}
-            </Chip>
+              <span className={`w-2 h-2 rounded-full ${isSelected ? dot : "bg-default-300"}`} />
+              <span>{plat.label}</span>
+            </button>
           );
         })}
       </div>

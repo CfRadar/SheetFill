@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, CardBody, Input, Button, Chip } from "@heroui/react";
-import { Building2, Package, Tag, Check, CheckCircle2, IndianRupee, Shirt, Hash } from "lucide-react";
+import { Input, Button, Tooltip, Select, SelectItem } from "@heroui/react";
+import {
+  Building2,
+  Tag,
+  Check,
+  CheckCircle2,
+  IndianRupee,
+  Shirt,
+  Hash,
+  ChevronDown,
+  ChevronUp,
+  Info,
+} from "lucide-react";
 import { applyMetaToAll, saveUserBrandDefaults } from "../api";
 import { useAuthStore } from "../auth/authStore";
 import { useAppStore } from "../store";
@@ -20,6 +31,7 @@ const SLEEVE_OPTIONS = [
 export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => {
   const { session, setSession, setError } = useAppStore();
   const { user } = useAuthStore();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const getInitialBrand = (): string => {
     return (
@@ -96,55 +108,44 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync state if session or user defaults update
   useEffect(() => {
-    if (session?.global_meta?.brand) setBrand(session.global_meta.brand);
-    else if (user?.brand_defaults?.brand) setBrand(user.brand_defaults.brand);
+    if (session?.global_meta) {
+      if (session.global_meta.brand) setBrand(session.global_meta.brand);
+      if (session.global_meta.manufacturer) setManufacturer(session.global_meta.manufacturer);
+      if (session.global_meta.packer) setPacker(session.global_meta.packer);
+      if (session.global_meta.hsn) setHsn(session.global_meta.hsn);
+      if (session.global_meta.mrp !== undefined) setMrp(String(session.global_meta.mrp));
+      if (session.global_meta.selling_price !== undefined) setSellingPrice(String(session.global_meta.selling_price));
+      if (session.global_meta.sleeve) setSleeve(session.global_meta.sleeve);
+    }
+  }, [session?.global_meta]);
 
-    if (session?.global_meta?.manufacturer) setManufacturer(session.global_meta.manufacturer);
-    else if (user?.brand_defaults?.manufacturer) setManufacturer(user.brand_defaults.manufacturer);
+  const handleApply = async (
+    customBrand?: string,
+    customMfr?: string,
+    customPacker?: string,
+    customHsn?: string,
+    customMrp?: string,
+    customSp?: string,
+    customSleeve?: string
+  ) => {
+    const b = customBrand !== undefined ? customBrand : brand;
+    const m = customMfr !== undefined ? customMfr : manufacturer;
+    const p = customPacker !== undefined ? customPacker : packer;
+    const h = customHsn !== undefined ? customHsn : hsn;
+    const rawMrp = customMrp !== undefined ? customMrp : mrp;
+    const rawSp = customSp !== undefined ? customSp : sellingPrice;
+    const sl = customSleeve !== undefined ? customSleeve : sleeve;
 
-    if (session?.global_meta?.packer) setPacker(session.global_meta.packer);
-    else if (user?.brand_defaults?.packer) setPacker(user.brand_defaults.packer);
-
-    if (session?.global_meta?.hsn) setHsn(session.global_meta.hsn);
-    else if (user?.brand_defaults?.hsn) setHsn(user.brand_defaults.hsn);
-
-    if (session?.global_meta?.mrp) setMrp(String(session.global_meta.mrp));
-    else if (user?.brand_defaults?.mrp) setMrp(String(user.brand_defaults.mrp));
-
-    if (session?.global_meta?.selling_price) setSellingPrice(String(session.global_meta.selling_price));
-    else if (user?.brand_defaults?.selling_price) setSellingPrice(String(user.brand_defaults.selling_price));
-
-    if (session?.global_meta?.sleeve) setSleeve(session.global_meta.sleeve);
-    else if (user?.brand_defaults?.sleeve) setSleeve(user.brand_defaults.sleeve);
-  }, [session?.global_meta, user?.brand_defaults]);
-
-  const handleApply = async (overrides?: {
-    brand?: string;
-    manufacturer?: string;
-    packer?: string;
-    hsn?: string;
-    mrp?: string;
-    selling_price?: string;
-    sleeve?: string;
-  }) => {
-    const b = (overrides?.brand !== undefined ? overrides.brand : brand).trim();
-    const m = (overrides?.manufacturer !== undefined ? overrides.manufacturer : manufacturer).trim();
-    const p = (overrides?.packer !== undefined ? overrides.packer : packer).trim();
-    const h = (overrides?.hsn !== undefined ? overrides.hsn : hsn).trim();
-    const mrpVal = (overrides?.mrp !== undefined ? overrides.mrp : mrp).trim();
-    const spVal = (overrides?.selling_price !== undefined ? overrides.selling_price : sellingPrice).trim();
-    const slVal = (overrides?.sleeve !== undefined ? overrides.sleeve : sleeve).trim();
-
-    if (!b && !m && !p && !h && !mrpVal && !spVal && !slVal) return;
-
-    setIsSaving(true);
-    setSaveStatus("idle");
+    const mrpVal = parseFloat(rawMrp) || 1999;
+    const spVal = parseFloat(rawSp) || 749;
+    const slVal = sl.trim() || "Half Sleeve";
 
     try {
-      // 1. Apply across session designs (Backend builder uses these for Columns AG, AB, AC, Y, K, L, AL)
-      const res = await applyMetaToAll(sessionId, {
+      setIsSaving(true);
+      setError(null);
+
+      const updated = await applyMetaToAll(sessionId, {
         brand: b,
         manufacturer: m,
         packer: p,
@@ -154,18 +155,9 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
         sleeve: slVal,
       });
 
-      if (session) {
-        setSession({
-          ...session,
-          global_meta: res.global_meta,
-          design_meta: res.design_meta,
-          designs: res.designs || session.designs,
-          summary: res.summary || session.summary,
-        });
-      }
+      setSession(updated);
 
-      // 2. Persist in user account in MongoDB so every new sheet gets these defaults
-      await saveUserBrandDefaults({
+      saveUserBrandDefaults({
         brand: b,
         manufacturer: m,
         packer: p,
@@ -173,18 +165,15 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
         mrp: mrpVal,
         selling_price: spVal,
         sleeve: slVal,
-      }).catch(() => {
-        // Soft fail if DB temporarily offline
-      });
+      }).catch(() => {});
 
-      // 3. Persist in localStorage for instant local availability
       if (typeof localStorage !== "undefined") {
         localStorage.setItem("fk_brand_name", b);
         localStorage.setItem("fk_manufacturer_name", m);
         localStorage.setItem("fk_packer_name", p);
         localStorage.setItem("fk_hsn_code", h);
-        localStorage.setItem("fk_mrp", mrpVal);
-        localStorage.setItem("fk_selling_price", spVal);
+        localStorage.setItem("fk_mrp", String(mrpVal));
+        localStorage.setItem("fk_selling_price", String(spVal));
         localStorage.setItem("fk_sleeve", slVal);
       }
 
@@ -201,49 +190,253 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
   };
 
   const handleBlur = () => {
-    if (brand.trim() || manufacturer.trim() || packer.trim() || hsn.trim() || mrp.trim() || sellingPrice.trim() || sleeve.trim()) {
-      handleApply();
-    }
+    handleApply();
   };
 
   return (
-    <Card
-      shadow="sm"
-      className="border border-divider bg-content1/80 backdrop-blur-md rounded-[14px] overflow-hidden"
-    >
-      <CardBody className="p-4 sm:p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-[8px] bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Building2 className="w-4 h-4" />
-            </div>
+    <div className="w-full rounded-2xl border border-divider/80 bg-content1/80 backdrop-blur-md overflow-hidden transition-all duration-200 shadow-xs">
+      {/* Compact Collapsible Summary Header */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setIsExpanded(!isExpanded)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
+        className="p-3 sm:px-4 sm:py-2.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-content2/50 transition-colors select-none"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Building2 className="w-3.5 h-3.5" />
+          </div>
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="text-xs font-bold text-foreground">Catalog Defaults:</span>
+            <span className="text-xs text-default-500 font-medium truncate">
+              Brand <strong className="text-foreground">"{brand}"</strong> · Packer <strong className="text-foreground">"{packer}"</strong> · ₹{sellingPrice} (MRP ₹{mrp}) · HSN {hsn} · {sleeve}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {saveStatus === "saved" && (
+            <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium animate-fadeIn">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Applied
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="light"
+            className="h-7 px-2 text-xs font-medium text-default-600 rounded-lg"
+          >
+            {isExpanded ? (
+              <>
+                <span>Collapse</span>
+                <ChevronUp className="w-3.5 h-3.5 ml-1" />
+              </>
+            ) : (
+              <>
+                <span>Edit</span>
+                <ChevronDown className="w-3.5 h-3.5 ml-1" />
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Expanded Form Grid */}
+      {isExpanded && (
+        <div className="p-4 sm:p-5 border-t border-divider/60 bg-content2/30 space-y-4 animate-fadeIn">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+            {/* 1. Brand */}
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-foreground">
-                  Catalog Defaults
-                </span>
-                <Chip
-                  size="sm"
-                  variant="flat"
-                  color="primary"
-                  className="h-5 text-[10px] font-semibold tracking-wide uppercase px-1.5"
-                >
-                  Applied across all T-shirts
-                </Chip>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-foreground">Brand</label>
+                <Tooltip content="Workbook Column AG (Brand Name)" placement="top" delay={150}>
+                  <Info className="w-3 h-3 text-default-400 cursor-help" />
+                </Tooltip>
               </div>
-              <p className="text-xs text-default-500">
-                Fills Brand (AG), Manufacturer (AB), Packer (AC), HSN (Y), MRP (K), Selling Price (L), and Sleeve (AL) across all entries in this workbook.
-              </p>
+              <Input
+                size="sm"
+                variant="bordered"
+                radius="sm"
+                placeholder="fashion continental"
+                value={brand}
+                onValueChange={setBrand}
+                onBlur={handleBlur}
+                startContent={<Tag className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
+                classNames={{
+                  inputWrapper: "h-9 rounded-xl bg-content1 border-divider",
+                  input: "text-xs font-medium",
+                }}
+              />
+            </div>
+
+            {/* 2. Manufacturer */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-foreground">Manufacturer</label>
+                <Tooltip content="Workbook Column AB (Manufacturer Details)" placement="top" delay={150}>
+                  <Info className="w-3 h-3 text-default-400 cursor-help" />
+                </Tooltip>
+              </div>
+              <Input
+                size="sm"
+                variant="bordered"
+                radius="sm"
+                placeholder="fashion continental"
+                value={manufacturer}
+                onValueChange={setManufacturer}
+                onBlur={handleBlur}
+                startContent={<Building2 className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
+                classNames={{
+                  inputWrapper: "h-9 rounded-xl bg-content1 border-divider",
+                  input: "text-xs font-medium",
+                }}
+              />
+            </div>
+
+            {/* 3. Packer */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-foreground">Packer</label>
+                <Tooltip content="Workbook Column AC (Packer Details)" placement="top" delay={150}>
+                  <Info className="w-3 h-3 text-default-400 cursor-help" />
+                </Tooltip>
+              </div>
+              <Input
+                size="sm"
+                variant="bordered"
+                radius="sm"
+                placeholder="fashion continental"
+                value={packer}
+                onValueChange={setPacker}
+                onBlur={handleBlur}
+                startContent={<Building2 className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
+                classNames={{
+                  inputWrapper: "h-9 rounded-xl bg-content1 border-divider",
+                  input: "text-xs font-medium",
+                }}
+              />
+            </div>
+
+            {/* 4. HSN */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-foreground">HSN Code</label>
+                <Tooltip content="Workbook Column Y (Harmonized System of Nomenclature)" placement="top" delay={150}>
+                  <Info className="w-3 h-3 text-default-400 cursor-help" />
+                </Tooltip>
+              </div>
+              <Input
+                size="sm"
+                variant="bordered"
+                radius="sm"
+                placeholder="610910"
+                value={hsn}
+                onValueChange={setHsn}
+                onBlur={handleBlur}
+                startContent={<Hash className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
+                classNames={{
+                  inputWrapper: "h-9 rounded-xl bg-content1 border-divider",
+                  input: "text-xs font-mono font-medium",
+                }}
+              />
+            </div>
+
+            {/* 5. MRP */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-foreground">Maximum Retail Price</label>
+                <Tooltip content="Workbook Column K (Maximum Retail Price in INR)" placement="top" delay={150}>
+                  <Info className="w-3 h-3 text-default-400 cursor-help" />
+                </Tooltip>
+              </div>
+              <Input
+                size="sm"
+                variant="bordered"
+                radius="sm"
+                type="number"
+                placeholder="1999"
+                value={mrp}
+                onValueChange={setMrp}
+                onBlur={handleBlur}
+                startContent={<IndianRupee className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
+                classNames={{
+                  inputWrapper: "h-9 rounded-xl bg-content1 border-divider",
+                  input: "text-xs font-medium",
+                }}
+              />
+            </div>
+
+            {/* 6. Selling Price */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-foreground">Selling Price</label>
+                <Tooltip content="Workbook Column L (Your Selling Price in INR)" placement="top" delay={150}>
+                  <Info className="w-3 h-3 text-default-400 cursor-help" />
+                </Tooltip>
+              </div>
+              <Input
+                size="sm"
+                variant="bordered"
+                radius="sm"
+                type="number"
+                placeholder="749"
+                value={sellingPrice}
+                onValueChange={setSellingPrice}
+                onBlur={handleBlur}
+                startContent={<IndianRupee className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
+                classNames={{
+                  inputWrapper: "h-9 rounded-xl bg-content1 border-divider",
+                  input: "text-xs font-medium",
+                }}
+              />
+            </div>
+
+            {/* 7. Sleeve Type */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-foreground">Default Sleeve</label>
+                <Tooltip content="Workbook Column AL (Sleeve Type)" placement="top" delay={150}>
+                  <Info className="w-3 h-3 text-default-400 cursor-help" />
+                </Tooltip>
+              </div>
+              <Select
+                size="sm"
+                variant="bordered"
+                radius="sm"
+                selectedKeys={[sleeve]}
+                onSelectionChange={(keys) => {
+                  const val = Array.from(keys)[0] as string;
+                  if (val) {
+                    setSleeve(val);
+                    handleApply(undefined, undefined, undefined, undefined, undefined, undefined, val);
+                  }
+                }}
+                aria-label="Default Sleeve"
+                startContent={<Shirt className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
+                classNames={{
+                  trigger: "h-9 rounded-xl bg-content1 border-divider",
+                  value: "text-xs font-medium",
+                }}
+              >
+                {SLEEVE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} textValue={opt.label}>
+                    <span className="text-xs">{opt.label}</span>
+                  </SelectItem>
+                ))}
+              </Select>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-            {saveStatus === "saved" && (
-              <span className="flex items-center gap-1 text-xs text-success-600 dark:text-success-400 font-medium animate-fadeIn">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Applied to all
-              </span>
-            )}
+          <div className="flex items-center justify-between pt-2 border-t border-divider/60">
+            <span className="text-[11px] text-default-400">
+              Values automatically update across all designs in this sheet.
+            </span>
             <Button
               size="sm"
               color="primary"
@@ -251,180 +444,13 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
               isLoading={isSaving}
               onPress={() => handleApply()}
               startContent={!isSaving && <Check className="w-3.5 h-3.5" />}
-              className="h-8 px-3 rounded-[9px] font-medium text-xs shadow-xs"
+              className="h-8 px-4 rounded-xl font-semibold text-xs"
             >
-              Apply to all T-shirts
+              Apply to All Designs
             </Button>
           </div>
         </div>
-
-        {/* 7 Responsive Global Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-          {/* 1. Brand (Col AG) */}
-          <div>
-            <label className="block text-[11px] font-medium text-default-600 mb-1">
-              Brand <span className="text-default-400 font-normal">(Col AG)</span>
-            </label>
-            <Input
-              size="sm"
-              variant="bordered"
-              radius="sm"
-              placeholder="fashion continental"
-              value={brand}
-              onValueChange={setBrand}
-              onBlur={handleBlur}
-              startContent={<Tag className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
-              classNames={{
-                inputWrapper:
-                  "h-9 rounded-[10px] bg-content2 border-divider hover:border-default-400 focus-within:border-primary",
-                input: "text-xs font-medium",
-              }}
-            />
-          </div>
-
-          {/* 2. Manufacturer Details (Col AB) */}
-          <div>
-            <label className="block text-[11px] font-medium text-default-600 mb-1">
-              Manufacturer <span className="text-default-400 font-normal">(Col AB)</span>
-            </label>
-            <Input
-              size="sm"
-              variant="bordered"
-              radius="sm"
-              placeholder="fashion continental, Surat"
-              value={manufacturer}
-              onValueChange={(val) => {
-                setManufacturer(val);
-                if (packer === manufacturer) {
-                  setPacker(val);
-                }
-              }}
-              onBlur={handleBlur}
-              startContent={<Building2 className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
-              classNames={{
-                inputWrapper:
-                  "h-9 rounded-[10px] bg-content2 border-divider hover:border-default-400 focus-within:border-primary",
-                input: "text-xs font-medium",
-              }}
-            />
-          </div>
-
-          {/* 3. Packer Details (Col AC) */}
-          <div>
-            <label className="block text-[11px] font-medium text-default-600 mb-1">
-              Packer <span className="text-default-400 font-normal">(Col AC)</span>
-            </label>
-            <Input
-              size="sm"
-              variant="bordered"
-              radius="sm"
-              placeholder="fashion continental, Surat"
-              value={packer}
-              onValueChange={setPacker}
-              onBlur={handleBlur}
-              startContent={<Package className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
-              classNames={{
-                inputWrapper:
-                  "h-9 rounded-[10px] bg-content2 border-divider hover:border-default-400 focus-within:border-primary",
-                input: "text-xs font-medium",
-              }}
-            />
-          </div>
-
-          {/* 4. HSN Code (Col Y) */}
-          <div>
-            <label className="block text-[11px] font-medium text-default-600 mb-1">
-              HSN Code <span className="text-default-400 font-normal">(Col Y)</span>
-            </label>
-            <Input
-              size="sm"
-              variant="bordered"
-              radius="sm"
-              placeholder="610910"
-              value={hsn}
-              onValueChange={setHsn}
-              onBlur={handleBlur}
-              startContent={<Hash className="w-3.5 h-3.5 text-default-400 shrink-0 mr-1" />}
-              classNames={{
-                inputWrapper:
-                  "h-9 rounded-[10px] bg-content2 border-divider hover:border-default-400 focus-within:border-primary",
-                input: "text-xs font-medium",
-              }}
-            />
-          </div>
-
-          {/* 5. MRP (Col K) */}
-          <div>
-            <label className="block text-[11px] font-medium text-default-600 mb-1">
-              MRP <span className="text-default-400 font-normal">(Col K)</span>
-            </label>
-            <Input
-              size="sm"
-              variant="bordered"
-              radius="sm"
-              type="number"
-              placeholder="1999"
-              value={mrp}
-              onValueChange={setMrp}
-              onBlur={handleBlur}
-              startContent={<IndianRupee className="w-3.5 h-3.5 text-default-400 shrink-0 mr-0.5" />}
-              classNames={{
-                inputWrapper:
-                  "h-9 rounded-[10px] bg-content2 border-divider hover:border-default-400 focus-within:border-primary",
-                input: "text-xs font-medium",
-              }}
-            />
-          </div>
-
-          {/* 6. Your Selling Price (Col L) */}
-          <div>
-            <label className="block text-[11px] font-medium text-default-600 mb-1">
-              Selling Price <span className="text-default-400 font-normal">(Col L)</span>
-            </label>
-            <Input
-              size="sm"
-              variant="bordered"
-              radius="sm"
-              type="number"
-              placeholder="749"
-              value={sellingPrice}
-              onValueChange={setSellingPrice}
-              onBlur={handleBlur}
-              startContent={<IndianRupee className="w-3.5 h-3.5 text-default-400 shrink-0 mr-0.5" />}
-              classNames={{
-                inputWrapper:
-                  "h-9 rounded-[10px] bg-content2 border-divider hover:border-default-400 focus-within:border-primary",
-                input: "text-xs font-medium",
-              }}
-            />
-          </div>
-
-          {/* 7. Sleeve (Col AL) */}
-          <div>
-            <label className="block text-[11px] font-medium text-default-600 mb-1">
-              Sleeve <span className="text-default-400 font-normal">(Col AL)</span>
-            </label>
-            <div className="relative">
-              <select
-                value={sleeve}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSleeve(val);
-                  handleApply({ sleeve: val });
-                }}
-                className="w-full h-9 rounded-[10px] bg-content2 border border-divider hover:border-default-400 focus:border-primary text-xs font-medium pl-8 pr-3 text-foreground outline-none transition-colors appearance-none cursor-pointer"
-              >
-                {SLEEVE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value} className="bg-content1 text-foreground">
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <Shirt className="w-3.5 h-3.5 text-default-400 absolute left-2.5 top-2.5 pointer-events-none" />
-            </div>
-          </div>
-        </div>
-      </CardBody>
-    </Card>
+      )}
+    </div>
   );
 };

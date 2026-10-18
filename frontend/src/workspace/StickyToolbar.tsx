@@ -27,11 +27,13 @@ import {
   MoreHorizontal,
   Layers,
   Sparkles,
+  HelpCircle,
+  FileText,
 } from "lucide-react";
 import { addSlots, generateWorkbook, getSession, downloadWorkbookFile } from "../api";
 import { useAppStore } from "../store";
-import { PromptDropdown } from "../components/PromptDropdown";
 import { toast } from "../ui/ToastProvider";
+import { FLIPKART_TSHIRT_PROMPT } from "../components/PromptDropdown";
 
 interface StickyToolbarProps {
   onOpenBulkPaste: () => void;
@@ -52,6 +54,13 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
+  // Prompt View modal
+  const {
+    isOpen: isPromptModalOpen,
+    onOpen: onOpenPromptModal,
+    onOpenChange: onPromptModalChange,
+  } = useDisclosure();
 
   // New Sheet confirmation modal
   const {
@@ -87,6 +96,15 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
       setError(err?.message || "Failed to add slots");
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const handleCopyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(FLIPKART_TSHIRT_PROMPT);
+      toast.success("ChatGPT Vision Prompt copied to clipboard!");
+    } catch {
+      toast.error("Failed to copy prompt.");
     }
   };
 
@@ -128,7 +146,6 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
       toast.success("Workbook generated successfully!", "Download ready");
       onGenerated(res.download_url, res.report, res.filename);
 
-      // Trigger automatic file download
       try {
         await downloadWorkbookFile(res.download_url, res.filename);
       } catch (dlErr: any) {
@@ -145,17 +162,17 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
     <>
       <header className="sticky top-0 z-30 bg-content1/80 backdrop-blur-md border-b border-divider px-4 sm:px-6 py-2.5 shadow-xs transition-colors">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          {/* Left section: Drawer toggle (mobile), Workbook chip, Circular progress ring */}
+          {/* Left section: Drawer toggle (mobile), Workbook chip, Slim progress indicator */}
           <div className="flex items-center gap-3 min-w-0">
             {onToggleMobileDrawer && (
               <Button
                 size="sm"
                 variant="flat"
-                className="lg:hidden h-9 px-3 rounded-xl text-xs font-medium"
+                className="lg:hidden h-8 px-2.5 rounded-xl text-xs font-semibold"
                 onPress={onToggleMobileDrawer}
                 startContent={<Layers className="w-3.5 h-3.5 text-primary" />}
               >
-                Designs ({totalCount})
+                {totalCount} Designs
               </Button>
             )}
 
@@ -169,175 +186,93 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
               {filename}
             </Chip>
 
-            {/* Circular Progress Ring & Ready Status */}
+            {/* Slim progress bar & ready status */}
             <div className="hidden md:flex items-center gap-2.5 pl-3 border-l border-divider/80">
-              <div className="relative flex items-center justify-center w-7 h-7 shrink-0">
-                <svg className="w-7 h-7 transform -rotate-90">
-                  <circle
-                    cx="14"
-                    cy="14"
-                    r="11"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    fill="transparent"
-                    className="text-default-200 dark:text-default-800"
-                  />
-                  <circle
-                    cx="14"
-                    cy="14"
-                    r="11"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    fill="transparent"
-                    strokeDasharray={2 * Math.PI * 11}
-                    strokeDashoffset={2 * Math.PI * 11 * (1 - percentReady / 100)}
-                    className="text-primary transition-all duration-500 ease-out"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <span className="absolute text-[9px] font-bold text-foreground">
-                  {percentReady}%
-                </span>
+              <div className="w-24 sm:w-32 h-1.5 rounded-full bg-default-100 overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300 rounded-full"
+                  style={{ width: `${percentReady}%` }}
+                />
               </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-semibold text-foreground whitespace-nowrap leading-none">
-                  {readyCount} of {totalCount} ready
-                </span>
-                <span className="text-[10px] text-default-400 mt-0.5 leading-none">
-                  {needsCount === 0 ? "All designs verified" : `${needsCount} pending info`}
-                </span>
-              </div>
+              <span className="text-xs font-semibold text-foreground whitespace-nowrap">
+                {readyCount} of {totalCount} ready
+              </span>
             </div>
           </div>
 
-          {/* Right section: Consolidated Toolbar actions */}
+          {/* Right section: Consolidated 1-Dominant Action + Grouped More Menu */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Desktop Secondary Actions (>= 1024px) */}
-            <div className="hidden lg:flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="flat"
-                color="default"
-                startContent={<ClipboardPaste className="w-3.5 h-3.5 text-default-500" />}
-                onPress={onOpenBulkPaste}
-                className="h-9 px-3.5 rounded-xl font-medium text-xs text-foreground bg-content2/80 hover:bg-default-200 border border-divider/80 transition-colors"
-              >
-                Paste all JSON
-              </Button>
+            {/* Secondary Action: Paste all JSON */}
+            <Button
+              size="sm"
+              variant="flat"
+              color="default"
+              startContent={<ClipboardPaste className="w-3.5 h-3.5 text-default-500" />}
+              onPress={onOpenBulkPaste}
+              className="h-9 px-3.5 rounded-xl font-medium text-xs text-foreground bg-content2/80 hover:bg-default-200 border border-divider/80 transition-colors hidden sm:inline-flex"
+            >
+              Paste all JSON
+            </Button>
 
-              <PromptDropdown />
+            {/* More Menu Dropdown (Groups Prompt, Add slots, New sheet) */}
+            <Dropdown placement="bottom-end">
+              <DropdownTrigger>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="default"
+                  className="h-9 px-2.5 rounded-xl text-xs font-medium text-default-600 bg-content2/80 hover:bg-default-200 border border-divider/80"
+                  startContent={<MoreHorizontal className="w-4 h-4 text-default-500" />}
+                >
+                  More
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="More workspace options" variant="flat">
+                <DropdownItem
+                  key="copy-prompt"
+                  textValue="Copy ChatGPT Vision Prompt"
+                  startContent={<FileText className="w-4 h-4 text-primary" />}
+                  onPress={handleCopyPrompt}
+                >
+                  Copy Vision Prompt
+                </DropdownItem>
+                <DropdownItem
+                  key="view-prompt"
+                  textValue="View Listing Prompt"
+                  startContent={<HelpCircle className="w-4 h-4 text-default-500" />}
+                  onPress={onOpenPromptModal}
+                >
+                  View Vision Prompt
+                </DropdownItem>
+                <DropdownItem
+                  key="add-slots"
+                  textValue="Add design slots"
+                  startContent={<Plus className="w-4 h-4 text-default-500" />}
+                  onPress={() => setIsPopoverOpen(true)}
+                >
+                  Add Empty Slots
+                </DropdownItem>
+                <DropdownItem
+                  key="paste-json-mobile"
+                  className="sm:hidden"
+                  textValue="Paste all JSON"
+                  startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
+                  onPress={onOpenBulkPaste}
+                >
+                  Paste All JSON
+                </DropdownItem>
+                <DropdownItem
+                  key="new-sheet"
+                  textValue="Start new sheet"
+                  startContent={<RotateCcw className="w-4 h-4 text-amber-500" />}
+                  onPress={onOpenConfirm}
+                >
+                  New Sheet (Reset)
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
 
-              <Popover
-                isOpen={isPopoverOpen}
-                onOpenChange={setIsPopoverOpen}
-                placement="bottom-end"
-                showArrow
-              >
-                <PopoverTrigger>
-                  <Button
-                    size="sm"
-                    variant="light"
-                    startContent={<Plus className="w-3.5 h-3.5 text-default-500" />}
-                    className="h-9 px-3 rounded-xl font-medium text-xs text-default-600 hover:text-foreground"
-                  >
-                    Add slots
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="p-3 w-56 rounded-2xl border border-divider bg-content1 shadow-xl">
-                  <div className="flex flex-col gap-2">
-                    <span className="text-xs font-semibold text-foreground">
-                      Add empty design slots
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        size="sm"
-                        min={1}
-                        max={summary?.room_for_new_designs || 20}
-                        value={String(slotCount)}
-                        onChange={(e) => setSlotCount(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-20"
-                        aria-label="Slots count"
-                      />
-                      <Button
-                        size="sm"
-                        color="primary"
-                        isLoading={isAdding}
-                        onPress={handleAddSlots}
-                        className="flex-1 font-medium rounded-xl"
-                      >
-                        Add
-                      </Button>
-                    </div>
-                    <span className="text-[11px] text-default-400">
-                      Max {summary?.room_for_new_designs || 20} slots available
-                    </span>
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              <Button
-                size="sm"
-                variant="light"
-                startContent={<RotateCcw className="w-3.5 h-3.5 text-default-500" />}
-                onPress={onOpenConfirm}
-                className="h-9 px-3 rounded-xl font-medium text-xs text-default-600 hover:text-foreground"
-              >
-                New sheet
-              </Button>
-            </div>
-
-            {/* Mobile / Tablet (< 1024px) More Dropdown */}
-            <div className="lg:hidden flex items-center">
-              <Dropdown placement="bottom-end">
-                <DropdownTrigger>
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    color="default"
-                    isIconOnly
-                    className="h-9 w-9 rounded-xl text-default-700 bg-content2/80 border border-divider"
-                    aria-label="More actions"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </DropdownTrigger>
-                <DropdownMenu aria-label="Toolbar options" variant="flat">
-                  {session.download_url ? (
-                    <DropdownItem
-                      key="download-workbook"
-                      startContent={<Download className="w-4 h-4 text-emerald-500" />}
-                      onPress={handleDirectDownload}
-                    >
-                      Download {extLabel}
-                    </DropdownItem>
-                  ) : null}
-                  <DropdownItem
-                    key="paste-json"
-                    startContent={<ClipboardPaste className="w-4 h-4 text-default-500" />}
-                    onPress={onOpenBulkPaste}
-                  >
-                    Paste all JSON
-                  </DropdownItem>
-                  <DropdownItem
-                    key="add-slots"
-                    startContent={<Plus className="w-4 h-4 text-default-500" />}
-                    onPress={() => setIsPopoverOpen(true)}
-                  >
-                    Add slots
-                  </DropdownItem>
-                  <DropdownItem
-                    key="new-sheet"
-                    startContent={<RotateCcw className="w-4 h-4 text-default-500" />}
-                    onPress={onOpenConfirm}
-                  >
-                    New sheet
-                  </DropdownItem>
-                </DropdownMenu>
-              </Dropdown>
-            </div>
-
-            {/* Direct Download Action: Appears whenever workbook is generated */}
+            {/* Direct Download Action: Appears when generated */}
             {session.download_url && (
               <Button
                 size="sm"
@@ -346,18 +281,18 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                 isLoading={isDownloading}
                 startContent={!isDownloading && <Download className="w-3.5 h-3.5" />}
                 onPress={handleDirectDownload}
-                className="h-9 px-3.5 rounded-xl font-semibold text-xs text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm transition-all"
+                className="h-9 px-3.5 rounded-xl font-semibold text-xs text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm"
               >
                 {isDownloading ? "Downloading..." : `Download ${extLabel}`}
               </Button>
             )}
 
-            {/* High-Contrast Magnet CTA: Generate Workbook (ALWAYS visible) */}
+            {/* Dominant Primary Action: Generate .xlsm (Single High-Contrast Magnet Button) */}
             {readyCount === 0 ? (
               <Tooltip
                 content={
                   needsCount > 0
-                    ? `${needsCount} design${needsCount > 1 ? "s" : ""} still need valid JSON`
+                    ? `${needsCount} design${needsCount > 1 ? "s" : ""} pending valid JSON`
                     : "No designs ready to generate"
                 }
                 placement="bottom-end"
@@ -370,7 +305,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                     variant="solid"
                     isDisabled
                     startContent={<FileSpreadsheet className="w-3.5 h-3.5" />}
-                    className="h-9 px-4 rounded-xl font-semibold text-xs opacity-50 cursor-not-allowed"
+                    className="h-9 px-4 rounded-xl font-bold text-xs opacity-50 cursor-not-allowed"
                   >
                     Generate {extLabel}
                   </Button>
@@ -393,18 +328,87 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
         </div>
       </header>
 
+      {/* Add Slots Popover Dialog */}
+      {isPopoverOpen && (
+        <Modal isOpen={isPopoverOpen} onClose={() => setIsPopoverOpen(false)} size="xs">
+          <ModalContent className="rounded-2xl border border-divider bg-content1 shadow-xl">
+            <ModalHeader className="text-sm font-bold border-b border-divider py-3 px-5">
+              Add Empty Design Slots
+            </ModalHeader>
+            <ModalBody className="p-5 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  size="sm"
+                  min={1}
+                  max={summary?.room_for_new_designs || 20}
+                  value={String(slotCount)}
+                  onChange={(e) => setSlotCount(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-24"
+                  aria-label="Slots count"
+                />
+                <Button
+                  size="sm"
+                  color="primary"
+                  isLoading={isAdding}
+                  onPress={handleAddSlots}
+                  className="flex-1 font-bold rounded-xl h-9"
+                >
+                  Add Slots
+                </Button>
+              </div>
+              <span className="text-[11px] text-default-400">
+                Max {summary?.room_for_new_designs || 20} slots available in template
+              </span>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* Vision Prompt Modal */}
+      <Modal isOpen={isPromptModalOpen} onOpenChange={onPromptModalChange} size="2xl" scrollBehavior="inside">
+        <ModalContent className="rounded-2xl border border-divider bg-content1 shadow-2xl">
+          {(onClose) => (
+            <>
+              <ModalHeader className="text-base font-bold border-b border-divider py-3.5 px-6 flex items-center justify-between">
+                <span>Flipkart ChatGPT Vision Prompt</span>
+                <Button
+                  size="sm"
+                  color="primary"
+                  onPress={handleCopyPrompt}
+                  startContent={<FileText className="w-3.5 h-3.5" />}
+                  className="rounded-xl font-semibold text-xs h-8 mr-6"
+                >
+                  Copy Prompt
+                </Button>
+              </ModalHeader>
+              <ModalBody className="p-6">
+                <pre className="text-xs font-mono bg-content2/60 p-4 rounded-xl border border-divider/60 whitespace-pre-wrap leading-relaxed select-text text-foreground">
+                  {FLIPKART_TSHIRT_PROMPT}
+                </pre>
+              </ModalBody>
+              <ModalFooter className="border-t border-divider py-3 px-6">
+                <Button size="sm" variant="light" onPress={onClose} className="rounded-xl">
+                  Close
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
       {/* New Sheet Confirmation Modal */}
       <Modal isOpen={isConfirmOpen} onOpenChange={onConfirmChange} size="sm">
         <ModalContent className="rounded-2xl border border-divider bg-content1 shadow-2xl">
           {(onClose) => (
             <>
-              <ModalHeader className="text-base font-semibold border-b border-divider py-3 px-5">
+              <ModalHeader className="text-base font-bold border-b border-divider py-3.5 px-5">
                 Start new sheet?
               </ModalHeader>
-              <ModalBody className="text-sm text-default-600 p-5">
-                Your current sheet progress and designs will be cleared from this browser session.
+              <ModalBody className="text-sm text-default-600 p-5 leading-relaxed">
+                Your current sheet designs and progress will be cleared from this workspace.
               </ModalBody>
-              <ModalFooter className="border-t border-divider py-3 px-5 flex items-center justify-end gap-2">
+              <ModalFooter className="border-t border-divider py-3.5 px-5 flex items-center justify-end gap-2">
                 <Button size="sm" variant="light" onPress={onClose} className="rounded-xl">
                   Cancel
                 </Button>
@@ -417,7 +421,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
                     onNewSheet();
                   }}
                 >
-                  Start new
+                  Start New
                 </Button>
               </ModalFooter>
             </>
