@@ -74,6 +74,20 @@ class BrowserManager:
     def is_available(self) -> bool:
         if self._playwright_unavailable:
             return False
+        # Explicit opt-out
+        if os.getenv("DISABLE_PLAYWRIGHT", "").lower() in ("1", "true", "yes"):
+            return False
+        # Render Free/Starter tier has a 512MB RAM cap. Launching headless Chromium
+        # on Render consumes 350-500MB+, causing an immediate OOM container kill (Instance failed: Ran out of memory).
+        # We automatically disable Playwright on Render unless ENABLE_PLAYWRIGHT=1 is explicitly opted in.
+        is_render = bool(
+            os.getenv("RENDER")
+            or os.getenv("RENDER_SERVICE_ID")
+            or os.getenv("RENDER_INSTANCE_ID")
+        )
+        if is_render and os.getenv("ENABLE_PLAYWRIGHT", "").lower() not in ("1", "true", "yes"):
+            logger.info("Render environment detected with 512MB cap: Playwright disabled, using lightweight HTTP/JSON scrapers.")
+            return False
         if sys.platform == "win32":
             try:
                 loop = asyncio.get_running_loop()
@@ -109,9 +123,16 @@ class BrowserManager:
                     browser_args = [
                         "--disable-blink-features=AutomationControlled",
                         "--disable-dev-shm-usage",
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-gpu",
+                        "--disable-software-rasterizer",
+                        "--renderer-process-limit=1",
+                        "--disable-extensions",
+                        "--mute-audio",
+                        "--no-zygote",
+                        "--js-flags=--max-old-space-size=128",
                     ]
-                    if os.getenv("IN_DOCKER") == "1":
-                        browser_args.extend(["--no-sandbox", "--disable-setuid-sandbox"])
 
                     launch_kwargs = {
                         "headless": True,

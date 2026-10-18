@@ -305,10 +305,20 @@ class MarketplaceScraperAgent:
 
         ordered_platforms = sorted(brief.platforms, key=get_priority)
 
-        tasks = []
-        for platform in ordered_platforms:
-            queries = plan.marketplace_queries.get(platform, plan.marketplace_queries.get("amazon", []))
-            tasks.append(self._scrape_single_platform(platform, queries, plan, emit, emit_node))
+        # Concurrency limit to prevent memory spikes in low-memory (e.g. 512MB) environments
+        sem = asyncio.Semaphore(2)
+
+        async def _bounded_scrape(p: PlatformName, q: list[str]) -> PlatformScrape:
+            async with sem:
+                return await self._scrape_single_platform(p, q, plan, emit, emit_node)
+
+        tasks = [
+            _bounded_scrape(
+                platform,
+                plan.marketplace_queries.get(platform, plan.marketplace_queries.get("amazon", [])),
+            )
+            for platform in ordered_platforms
+        ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 

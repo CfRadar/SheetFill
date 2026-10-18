@@ -42,13 +42,22 @@ interface Props {
   onKeyUpdated?: (status: KeyStatus) => void;
 }
 
+const DEFAULT_MODELS = [
+  "meta-llama/llama-3.3-70b-instruct",
+  "google/gemini-2.0-flash-exp:free",
+  "deepseek/deepseek-r1:free",
+  "meta-llama/llama-3.1-8b-instruct:free",
+  "qwen/qwen-2.5-72b-instruct",
+  "mistralai/mistral-large-2407",
+];
+
 export const KeySettingsModal: React.FC<Props> = ({ isOpen, onClose, onKeyUpdated }) => {
   const [status, setStatus] = useState<KeyStatus | null>(null);
   const [keysList, setKeysList] = useState<MultiKeyItem[]>([]);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [keyLabelInput, setKeyLabelInput] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>("meta-llama/llama-3.3-70b-instruct");
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>(DEFAULT_MODELS);
   const [showKey, setShowKey] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingKey, setIsAddingKey] = useState(false);
@@ -325,7 +334,7 @@ export const KeySettingsModal: React.FC<Props> = ({ isOpen, onClose, onKeyUpdate
               aria-label="Select AI Model"
               className="w-full"
             >
-              {models.map((m) => (
+              {Array.from(new Set([selectedModel, ...models])).map((m) => (
                 <SelectItem key={m} textValue={m}>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono">{m}</span>
