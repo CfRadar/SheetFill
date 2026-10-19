@@ -53,7 +53,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
           startContent={!isDownloading && <Download className="w-4 h-4 text-emerald-800" />}
           className="bg-white text-emerald-800 hover:bg-emerald-50 font-bold text-xs rounded-[10px] px-4 h-9 shrink-0 shadow-xs"
         >
-          {isDownloading ? "Downloading..." : `Download ${filename || ".xlsm"}`}
+          {isDownloading ? "Downloading..." : `Download ${filename || ".xls"}`}
         </Button>
       </div>
 
@@ -114,7 +114,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({
             startContent={!isDownloading && <Download className="w-3.5 h-3.5" />}
             className="text-xs font-semibold"
           >
-            {isDownloading ? "Downloading..." : `Download ${filename || ".xlsm"}`}
+            {isDownloading ? "Downloading..." : `Download ${filename || ".xls"}`}
           </Button>
         </div>
       </div>

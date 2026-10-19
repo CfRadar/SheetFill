@@ -783,11 +783,11 @@ async def generate_workbook(
     if not ready_rows_map and not any(d.status == "complete" for d in session.designs):
         return _json_error(400, "NO_READY_DESIGNS", "At least one design must be ready to generate.")
 
-    # Generate workbook with base name in macro-enabled .xlsm format
+    # Generate workbook with base name in .xls format
     sdir = store._session_dir(sid)
-    orig_name = session.original_filename or "sheet.xlsm"
+    orig_name = session.original_filename or "sheet.xls"
     base_name = Path(orig_name).stem
-    out_filename = f"{base_name}.xlsm"
+    out_filename = f"{base_name}.xls"
     out_path = sdir / out_filename
 
     try:
@@ -828,23 +828,72 @@ async def download_workbook(
     user: CurrentUser = Depends(require_user),
 ) -> Any:
     session = store.get_session(sid, user_id=user.id)
-    if not session or not session.output_filename:
-        return _json_error(404, "FILE_NOT_FOUND", "Generated workbook not found for this session.")
+    if not session:
+        return _json_error(404, "FILE_NOT_FOUND", "Session not found.")
 
     sdir = store._session_dir(sid)
-    fpath = sdir / session.output_filename
-    # Fallback to alternate extension if renamed
-    if not fpath.exists():
-        alt_path = sdir / f"{Path(session.output_filename).stem}.xlsm"
-        if alt_path.exists():
-            fpath = alt_path
-        else:
-            alt_xls = sdir / f"{Path(session.output_filename).stem}.xls"
-            if alt_xls.exists():
-                fpath = alt_xls
+    orig_name = session.original_filename or "sheet.xls"
+    base_name = Path(orig_name).stem
+    target_filename = session.output_filename or f"{base_name}.xls"
 
+    fpath = sdir / target_filename
     if not fpath.exists():
-        return _json_error(404, "FILE_NOT_FOUND", f"File '{session.output_filename}' not found on disk.")
+        alt_xls = sdir / f"{base_name}.xls"
+        alt_xlsm = sdir / f"{base_name}.xlsm"
+        if alt_xls.exists():
+            fpath = alt_xls
+        elif alt_xlsm.exists():
+            fpath = alt_xlsm
+
+    # Auto-regenerate on demand if missing from disk (e.g. server restart or ephemeral container)
+    if not fpath or not fpath.exists():
+        try:
+            mapper = get_default_mapper()
+            existing_skus: Set[str] = set()
+            ready_rows_map: Dict[str, Any] = {}
+            for idx, d in enumerate(session.designs, start=1):
+                if d.id in session.design_jsons:
+                    jobj = session.design_jsons[d.id]
+                    meta_override = dict(session.global_meta or {})
+                    meta_override.update(session.design_meta.get(d.id, {}))
+                    b_res = build_design_rows(
+                        design=d,
+                        json_data=jobj,
+                        mapper=mapper,
+                        existing_skus_in_session=existing_skus,
+                        custom_sizes=session.design_sizes.get(d.id),
+                        image_edits=session.design_image_edits.get(d.id),
+                        product_link_edit=session.design_product_links.get(d.id),
+                        meta_override=meta_override,
+                        design_index=idx,
+                    )
+                    if b_res.status == "ready":
+                        ready_rows_map[d.id] = b_res.rows
+
+            if ready_rows_map or any(d.status == "complete" for d in session.designs):
+                gen_name = f"{base_name}.xls"
+                gen_path = sdir / gen_name
+                out_file, report = await asyncio.to_thread(
+                    rebuild_tshirt_workbook,
+                    master_template_path=_get_master_template_path(),
+                    output_path=str(gen_path),
+                    designs=session.designs,
+                    ready_rows_map=ready_rows_map,
+                    mode="ready_only",
+                )
+                session.output_filename = gen_name
+                session.report = report
+                store.save_session(session)
+                fpath = gen_path
+        except Exception:
+            pass
+
+    if not fpath or not fpath.exists():
+        return _json_error(
+            404,
+            "FILE_NOT_FOUND",
+            "Generated workbook not found for this session. Please click 'Generate .xls' to create the sheet.",
+        )
 
     await log_event(
         event_type="download_workbook",
@@ -862,7 +911,9 @@ async def download_workbook(
     }
 
     media_type = (
-        "application/vnd.ms-excel.sheet.macroEnabled.12"
+        "application/vnd.ms-excel"
+        if fpath.suffix.lower() == ".xls"
+        else "application/vnd.ms-excel.sheet.macroEnabled.12"
         if fpath.suffix.lower() == ".xlsm"
         else "application/vnd.ms-excel"
     )

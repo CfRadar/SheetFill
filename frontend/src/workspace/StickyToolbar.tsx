@@ -79,9 +79,8 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
   const needsCount = totalCount - readyCount;
   const percentReady = totalCount > 0 ? Math.round((readyCount / totalCount) * 100) : 0;
 
-  // Detect output extension
-  const isXls = filename?.toLowerCase().endsWith(".xls") && !filename?.toLowerCase().endsWith(".xlsm");
-  const extLabel = isXls ? ".xls" : ".xlsm";
+  // Output format is .xls
+  const extLabel = ".xls";
 
   const handleAddSlots = async () => {
     if (slotCount < 1) return;
@@ -109,12 +108,59 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
   };
 
   const handleDirectDownload = async () => {
-    const url = session?.download_url;
-    if (!url || isDownloading) return;
+    if (isDownloading) return;
     try {
       setIsDownloading(true);
-      await downloadWorkbookFile(url, session.output_filename || undefined);
-      toast.success("Workbook downloaded successfully!");
+      const url = session?.download_url;
+      const targetFilename = session?.output_filename || undefined;
+
+      if (!url) {
+        toast.info("Generating .xls workbook...");
+        const res = await generateWorkbook(session.session_id, "ready_only");
+        try {
+          const refreshed = await getSession(session.session_id);
+          setSession(refreshed);
+        } catch {
+          setSession({
+            ...session,
+            download_url: res.download_url,
+            output_filename: res.filename,
+            report: res.report,
+          });
+        }
+        onGenerated(res.download_url, res.report, res.filename);
+        await downloadWorkbookFile(res.download_url, res.filename);
+        toast.success("Workbook downloaded successfully!");
+        return;
+      }
+
+      try {
+        await downloadWorkbookFile(url, targetFilename);
+        toast.success("Workbook downloaded successfully!");
+      } catch (dlErr: any) {
+        // If file not found on server (e.g. server restart or ephemeral container), auto-regenerate and retry
+        const msg = String(dlErr?.message || "").toLowerCase();
+        if (msg.includes("not found") || msg.includes("404")) {
+          toast.info("Regenerating .xls workbook...");
+          const res = await generateWorkbook(session.session_id, "ready_only");
+          try {
+            const refreshed = await getSession(session.session_id);
+            setSession(refreshed);
+          } catch {
+            setSession({
+              ...session,
+              download_url: res.download_url,
+              output_filename: res.filename,
+              report: res.report,
+            });
+          }
+          onGenerated(res.download_url, res.report, res.filename);
+          await downloadWorkbookFile(res.download_url, res.filename);
+          toast.success("Workbook downloaded successfully!");
+        } else {
+          throw dlErr;
+        }
+      }
     } catch (err: any) {
       console.error("Direct download error:", err);
       toast.error(err?.message || "Failed to download workbook");

@@ -283,7 +283,7 @@ export async function downloadWorkbookFile(
   const blobUrl = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = blobUrl;
-  a.download = resolvedFilename || "Flipkart_Filled_TShirt_Sheet.xlsm";
+  a.download = resolvedFilename || "Flipkart_Filled_TShirt_Sheet.xls";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
