@@ -105,13 +105,15 @@ export const useAppStore = create<AppState>()(
           let nextActiveId = state.activeDesignId;
           const sanitizedSession = session
             ? {
+                ...state.session,
                 ...session,
-                design_sizes: session.design_sizes || {},
-                design_raw_text: session.design_raw_text || {},
-                design_jsons: session.design_jsons || {},
-                design_image_edits: session.design_image_edits || {},
-                design_product_links: session.design_product_links || {},
-                design_meta: session.design_meta || {},
+                session_id: session.session_id || state.session?.session_id || "",
+                design_sizes: session.design_sizes || state.session?.design_sizes || {},
+                design_raw_text: session.design_raw_text || state.session?.design_raw_text || {},
+                design_jsons: session.design_jsons || state.session?.design_jsons || {},
+                design_image_edits: session.design_image_edits || state.session?.design_image_edits || {},
+                design_product_links: session.design_product_links || state.session?.design_product_links || {},
+                design_meta: session.design_meta || state.session?.design_meta || {},
               }
             : null;
 

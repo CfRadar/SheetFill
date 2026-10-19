@@ -319,7 +319,7 @@ export async function saveDesignMeta(
 export async function applyMetaToAll(
   sessionId: string,
   meta: BrandMeta
-): Promise<any> {
+): Promise<SessionState> {
   const res = await authFetch(`${BASE_URL}/sheets/${sessionId}/meta/apply-all`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -329,7 +329,11 @@ export async function applyMetaToAll(
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message || "Failed to apply details to all T-shirts");
   }
-  return res.json();
+  const data = await res.json();
+  if (data && data.session_id) {
+    return data;
+  }
+  return getSession(sessionId);
 }
 
 export async function saveUserBrandDefaults(defaults: {

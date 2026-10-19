@@ -105,10 +105,15 @@ export const BrandMetaEditor: React.FC<BrandMetaEditorProps> = ({
     ) {
       return;
     }
+    const activeSessionId = sessionId || session?.session_id;
+    if (!activeSessionId) {
+      setError("No active session found");
+      return;
+    }
     setIsApplyingAll(true);
     setSavedNotice(null);
     try {
-      const res = await applyMetaToAll(sessionId, {
+      const res = await applyMetaToAll(activeSessionId, {
         hsn: hsn.trim(),
         brand: brand.trim(),
         manufacturer: manufacturer.trim(),

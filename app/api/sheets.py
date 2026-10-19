@@ -601,13 +601,29 @@ def apply_meta_all(
             )
 
     refreshed = store.get_session(sid, user_id=user.id)
-    return {
-        "status": "ok",
-        "global_meta": refreshed.global_meta,
-        "design_meta": refreshed.design_meta,
-        "designs": refreshed.designs,
-        "summary": refreshed.summary,
-    }
+    download_url = (
+        f"/api/sheets/{sid}/download?t={int(refreshed.updated_at)}"
+        if refreshed.output_filename
+        else None
+    )
+    return SessionResponse(
+        session_id=refreshed.session_id,
+        filename=refreshed.original_filename,
+        created_at=refreshed.created_at,
+        updated_at=refreshed.updated_at,
+        summary=refreshed.summary,
+        designs=refreshed.designs,
+        design_jsons=refreshed.design_jsons,
+        design_raw_text=refreshed.design_raw_text,
+        design_sizes=refreshed.design_sizes,
+        design_image_edits=refreshed.design_image_edits,
+        design_product_links=refreshed.design_product_links,
+        design_meta=refreshed.design_meta,
+        global_meta=refreshed.global_meta,
+        download_url=download_url,
+        output_filename=refreshed.output_filename,
+        report=refreshed.report,
+    )
 
 
 @router.post("/sheets/{sid}/bulk-assign")

@@ -141,11 +141,17 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
     const spVal = parseFloat(rawSp) || 749;
     const slVal = sl.trim() || "Half Sleeve";
 
+    const activeSessionId = sessionId || session?.session_id;
+    if (!activeSessionId) {
+      setError("No active session found");
+      return;
+    }
+
     try {
       setIsSaving(true);
       setError(null);
 
-      const updated = await applyMetaToAll(sessionId, {
+      const updated = await applyMetaToAll(activeSessionId, {
         brand: b,
         manufacturer: m,
         packer: p,
@@ -155,7 +161,11 @@ export const GlobalBrandBar: React.FC<GlobalBrandBarProps> = ({ sessionId }) => 
         sleeve: slVal,
       });
 
-      setSession(updated);
+      setSession({
+        ...session,
+        ...updated,
+        session_id: activeSessionId,
+      });
 
       saveUserBrandDefaults({
         brand: b,
