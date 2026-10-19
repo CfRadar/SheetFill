@@ -103,35 +103,53 @@ export const useAppStore = create<AppState>()(
       setSession: (session) =>
         set((state) => {
           let nextActiveId = state.activeDesignId;
-          if (session && session.designs && session.designs.length > 0) {
-            if (!nextActiveId || !session.designs.some((d) => d.id === nextActiveId)) {
-              const firstIncomplete = session.designs.find(
+          const sanitizedSession = session
+            ? {
+                ...session,
+                design_sizes: session.design_sizes || {},
+                design_raw_text: session.design_raw_text || {},
+                design_jsons: session.design_jsons || {},
+                design_image_edits: session.design_image_edits || {},
+                design_product_links: session.design_product_links || {},
+                design_meta: session.design_meta || {},
+              }
+            : null;
+
+          if (sanitizedSession && sanitizedSession.designs && sanitizedSession.designs.length > 0) {
+            if (!nextActiveId || !sanitizedSession.designs.some((d) => d.id === nextActiveId)) {
+              const firstIncomplete = sanitizedSession.designs.find(
                 (d) => d.status !== "ready" && d.status !== "complete"
               );
-              nextActiveId = firstIncomplete ? firstIncomplete.id : session.designs[0].id;
+              nextActiveId = firstIncomplete ? firstIncomplete.id : sanitizedSession.designs[0].id;
             }
-          } else if (!session) {
+          } else if (!sanitizedSession) {
             nextActiveId = null;
           }
-          return { session, activeDesignId: nextActiveId };
+          return { session: sanitizedSession, activeDesignId: nextActiveId };
         }),
 
       setActiveDesignId: (activeDesignId) => set({ activeDesignId }),
       setFilterMode: (filterMode) => set({ filterMode }),
       toggleDesignExpanded: (designId) =>
-        set((state) => ({
-          expandedDesigns: {
-            ...state.expandedDesigns,
-            [designId]: !state.expandedDesigns[designId],
-          },
-        })),
+        set((state) => {
+          const current = state.expandedDesigns || {};
+          return {
+            expandedDesigns: {
+              ...current,
+              [designId]: !current[designId],
+            },
+          };
+        }),
       setDesignExpanded: (designId, expanded) =>
-        set((state) => ({
-          expandedDesigns: {
-            ...state.expandedDesigns,
-            [designId]: expanded,
-          },
-        })),
+        set((state) => {
+          const current = state.expandedDesigns || {};
+          return {
+            expandedDesigns: {
+              ...current,
+              [designId]: expanded,
+            },
+          };
+        }),
       setBulkDialogOpen: (open) => set({ isBulkDialogOpen: open }),
       resetSheetFiller: () =>
         set({
@@ -187,25 +205,36 @@ export const useAppStore = create<AppState>()(
     {
       name: "sheetfill_workspace_store",
       storage: createJSONStorage(() => idbStorage),
-      version: 1,
-      migrate: (persistedState: any, version: number) => {
-        if (version === 0 || !version) {
-          return {
-            ...persistedState,
-            brief: persistedState?.brief || DEFAULT_BRIEF,
-            runStatus: persistedState?.runStatus || "idle",
-            events: persistedState?.events || [],
-          };
-        }
-        return persistedState;
+      version: 2,
+      migrate: (persistedState: any, _version: number) => {
+        const state = persistedState || {};
+        return {
+          ...state,
+          brief: state.brief || DEFAULT_BRIEF,
+          runStatus: state.runStatus || "idle",
+          events: state.events || [],
+          filterMode: state.filterMode || "all",
+          expandedDesigns: state.expandedDesigns || {},
+          session: state.session
+            ? {
+                ...state.session,
+                design_sizes: state.session.design_sizes || {},
+                design_raw_text: state.session.design_raw_text || {},
+                design_jsons: state.session.design_jsons || {},
+                design_image_edits: state.session.design_image_edits || {},
+                design_product_links: state.session.design_product_links || {},
+                design_meta: state.session.design_meta || {},
+              }
+            : null,
+        };
       },
       partialize: (state) => ({
         // Persist only workspace data; omit transient runtime flags like loading and error
         activeSection: state.activeSection,
         session: state.session,
         activeDesignId: state.activeDesignId,
-        filterMode: state.filterMode,
-        expandedDesigns: state.expandedDesigns,
+        filterMode: state.filterMode || "all",
+        expandedDesigns: state.expandedDesigns || {},
         brief: state.brief,
         currentRunId: state.currentRunId,
         runStatus: state.runStatus,

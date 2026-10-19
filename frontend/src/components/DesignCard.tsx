@@ -15,15 +15,21 @@ const BRAND_SIZES = ["S", "M", "L", "XL", "XS", "XXL", "3XL", "4XL", "5XL", "Fre
 
 export const DesignCard: React.FC<DesignCardProps> = ({ design, index }) => {
   const { session, setSession, expandedDesigns, toggleDesignExpanded, setError } = useAppStore();
-  const isExpanded = expandedDesigns[design.id] !== undefined ? expandedDesigns[design.id] : design.status !== "complete";
+  const isExpanded =
+    expandedDesigns && expandedDesigns[design.id] !== undefined
+      ? expandedDesigns[design.id]
+      : design.status !== "complete";
 
   const [sizes, setSizes] = useState<string[]>(
-    session?.design_sizes[design.id] || design.sizes_found.length > 0 ? design.sizes_found : ["S", "M", "L", "XL"]
+    session?.design_sizes?.[design.id] ||
+      (design.sizes_found && design.sizes_found.length > 0
+        ? design.sizes_found
+        : ["S", "M", "L", "XL"])
   );
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const initialJsonText = session?.design_raw_text[design.id] || "";
+  const initialJsonText = session?.design_raw_text?.[design.id] || "";
 
   const handleToggleSize = async (size: string) => {
     const next = sizes.includes(size) ? sizes.filter((s) => s !== size) : [...sizes, size];
@@ -186,8 +192,8 @@ export const DesignCard: React.FC<DesignCardProps> = ({ design, index }) => {
 
           {/* Image Links Editor */}
           <ImageLinksEditor
-            imageUrls={session?.design_image_edits[design.id] || design.image_urls}
-            productLink={session?.design_product_links[design.id] ?? design.product_link}
+            imageUrls={session?.design_image_edits?.[design.id] || design.image_urls}
+            productLink={session?.design_product_links?.[design.id] ?? design.product_link}
             isManualSlot={design.is_manual_slot}
             onSave={handleSaveImages}
           />

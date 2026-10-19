@@ -8,14 +8,14 @@ interface DesignListSidebarProps {
   designs: DetectedDesign[];
   activeDesignId: string;
   onSelectDesign: (id: string) => void;
-  designSizes: Record<string, string[]>;
+  designSizes?: Record<string, string[]>;
 }
 
 export const DesignListSidebar: React.FC<DesignListSidebarProps> = ({
   designs,
   activeDesignId,
   onSelectDesign,
-  designSizes,
+  designSizes = {},
 }) => {
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState<string>("");
@@ -178,7 +178,7 @@ export const DesignListSidebar: React.FC<DesignListSidebarProps> = ({
           filteredDesigns.map((design) => {
             const isActive = design.id === activeDesignId;
             const globalIndex = designs.findIndex((d) => d.id === design.id);
-            const sizes = resolveDesignSizes(designSizes[design.id], design.sizes_found);
+            const sizes = resolveDesignSizes(designSizes?.[design.id], design.sizes_found || []);
             const rowsStr =
               design.sheet_rows.length > 1
                 ? `Rows ${design.sheet_rows[0]}–${design.sheet_rows[design.sheet_rows.length - 1]}`

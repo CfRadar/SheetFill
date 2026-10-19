@@ -52,7 +52,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const { session, setSession, setError } = useAppStore();
 
   const [sizes, setSizes] = useState<string[]>(() =>
-    resolveDesignSizes(session?.design_sizes[design.id], design.sizes_found)
+    resolveDesignSizes(session?.design_sizes?.[design.id], design.sizes_found || [])
   );
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [isImagesExpanded, setIsImagesExpanded] = useState(false);
@@ -65,18 +65,18 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
     onOpenChange: onDeleteChange,
   } = useDisclosure();
 
-  const initialJsonText = session?.design_raw_text[design.id] || "";
+  const initialJsonText = session?.design_raw_text?.[design.id] || "";
 
   // Keep sizes local state in sync when active design changes
   useEffect(() => {
-    setSizes(resolveDesignSizes(session?.design_sizes[design.id], design.sizes_found));
+    setSizes(resolveDesignSizes(session?.design_sizes?.[design.id], design.sizes_found || []));
   }, [design.id, session?.design_sizes]);
 
   // Load preview rows if json already present and previewRows is currently empty
   useEffect(() => {
     let isMounted = true;
-    if (session && session.design_jsons[design.id]) {
-      const currentRaw = session.design_raw_text[design.id];
+    if (session?.design_jsons?.[design.id]) {
+      const currentRaw = session?.design_raw_text?.[design.id];
       if (currentRaw && currentRaw.trim()) {
         saveDesignJson(session.session_id, design.id, currentRaw)
           .then((res) => {
@@ -108,7 +108,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
         setSession({
           ...session,
           design_sizes: {
-            ...session.design_sizes,
+            ...(session.design_sizes || {}),
             [design.id]: next,
           },
         });

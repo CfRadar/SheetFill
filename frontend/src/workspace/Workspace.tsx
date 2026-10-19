@@ -116,7 +116,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
               designs={designs}
               activeDesignId={activeDesignId}
               onSelectDesign={handleSelectDesign}
-              designSizes={design_sizes}
+              designSizes={design_sizes || {}}
             />
           </div>
 
@@ -158,7 +158,7 @@ export const Workspace: React.FC<WorkspaceProps> = ({ onNewSheet }) => {
                   designs={designs}
                   activeDesignId={activeDesignId}
                   onSelectDesign={handleSelectDesign}
-                  designSizes={design_sizes}
+                  designSizes={design_sizes || {}}
                 />
               </DrawerBody>
             </>
