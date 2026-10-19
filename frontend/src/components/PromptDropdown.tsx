@@ -3,56 +3,117 @@ import { Button } from "@heroui/react";
 import { Check, FileText } from "lucide-react";
 import { toast } from "../ui/ToastProvider";
 
-export const FLIPKART_TSHIRT_PROMPT = `You are a Flipkart catalog specialist. I will upload exactly ONE reference image containing a T-shirt worn by a model. Analyze this image carefully and derive ALL product information exclusively from what is visibly supported by the image, including garment type, gender, color, fit, sleeve length, neckline, length, artwork, graphics, typography, design placement, pattern, and styling. Do not assume the garment is women's, men's, unisex, black, oversized, or any particular style. The model's appearance alone must not determine the garment's gender category. Use only visible evidence, and never invent or assume missing details. If a detail cannot be reliably determined from the image, use an appropriate neutral value or an empty string where permitted.
+export const FLIPKART_TSHIRT_PROMPT = `You are an expert Flipkart catalog and apparel vision specialist. I am uploading a reference image showing a model wearing a T-shirt. Analyze the image with extreme visual precision and generate a 100% accurate, complete Flipkart listing JSON object.
 
-Return ONLY a valid JSON object, without Markdown fences or explanations. Follow the exact JSON structure, field order, and writing style of the example. Generate an SEO-friendly Flipkart listing that accurately represents the uploaded product and complies with marketplace guidelines. Do not include brand names, celebrity names, or copyrighted character names.
+CRITICAL EVALUATION GUIDELINES (EVALUATE THE REFERENCE MODEL IN THE PHOTO):
 
-HARD LENGTH LIMITS
-- product_title: 5–7 words, maximum 45 characters. Generate a title matching the actual garment and its visibly supported characteristics. Do not force a fixed gender, color, or fit.
-- product_description: Exactly 3 sentences, maximum 450 characters.
-- key_features: Exactly 10 items, each 3–8 words, maximum 50 characters per item.
-- key_features_sheet: Exactly 4 items, maximum 25 characters each.
-- search_keywords: Exactly 4 items, maximum 20 characters each.
-- description_override: Use only the specified template and information from the generated JSON fields. Do not add extra headings, sentences, or marketing claims. Maximum 1000 characters.
+1. TARGET GENDER & AUDIENCE (ideal_for):
+   - Look directly at the human model wearing the garment in the photo:
+     * If a male model (man / boy) is wearing the T-shirt: set "ideal_for": "Men". The product_title MUST start with "Men" or "Men's".
+     * If a female model (woman / girl) is wearing the T-shirt: set "ideal_for": "Women". The product_title MUST start with "Women" or "Women's".
+     * If both a male and female model appear together, or if it is explicitly a matching couple set: set "ideal_for": "Couple".
+     * Flat-lay / garment alone without any model: Only in this rare case evaluate cut ("Men", "Women", or "Unisex").
+   - NEVER mark "Unisex" if a clear male or female model is wearing the garment. Always assign the model's actual gender.
 
-CONTENT RULES
-1. The single uploaded reference image is the sole source of truth for all product-specific details. Do not use assumptions, previous listings, example values, or default product attributes.
-2. Identify the actual garment and its characteristics from the image. Adapt every relevant JSON field to the visible product, including gender category, garment color, brand color, fit, sleeves, neckline, length, material when verifiable, pattern, surface styling, and print placement.
-3. Do not automatically classify the garment as women's or men's based only on the model's gender or appearance. Select a gender category only when supported by reliable product-specific visual evidence; otherwise use an appropriate neutral value permitted by the schema.
-4. Never force 3/4 sleeves, oversized fit, round neck, black color, cotton blend, or any other example attribute unless the image supports it. Describe sleeve length and neckline accurately. If the exact sleeve length or material cannot be established visually, do not invent it.
-5. Do not describe invisible fabric properties, comfort, breathability, durability, print quality, or care requirements as verified facts unless explicitly supported by the image. Use neutral wording or empty values where permitted.
-6. Do not include trademarked brand names, celebrity names, or copyrighted character names. Describe recognizable artwork generically.
-7. Use "::" to separate multiple values, with no spaces around the separator.
-8. For pattern, surface_styling, detail_placement, and tee_length, use only the allowed values below, with exact spelling and capitalization.
+2. PATTERN & PRINT TYPE (pattern):
+   - Inspect the artwork on the T-shirt with high precision:
+     * Graphic Print: Choose "Graphic Print" if there is ANY illustration, anime/manga art, cartoon/character, drawing, painting, skull, vehicle, animal, abstract visual artwork, or graphic image (even if accompanied by words or brand typography).
+     * Typography: Choose "Typography" ONLY if the garment has purely written text, words, quotes, slogans, or letters with NO visual drawings/graphics.
+     * Solid: Choose "Solid" if the garment is completely plain without any graphic, print, or text.
+     * Striped: Choose "Striped" for horizontal, vertical, or diagonal stripes across the body.
+     * Colorblock: Choose "Colorblock" for contrasting cut-and-sew geometric color panels.
+     * Tie & Dye: Choose "Tie & Dye" for tie-dye, acid wash, or dip-dye effects.
 
-ALLOWED VALUES
+3. PRINT COVERAGE & DETAIL PLACEMENT (print_coverage, detail_placement):
+   - Chest: Print is restricted to the upper chest / pocket area -> "print_coverage": "Chest", "detail_placement": "Chest".
+   - Full Front: Large print occupying the front torso/stomach -> "print_coverage": "Full Front", "detail_placement": "Front Panel".
+   - Back: Main artwork is printed on the back panel -> "print_coverage": "Back", "detail_placement": "Back Panel".
+   - All Over: Print/pattern repeats continuously across front, back, and sleeves -> "print_coverage": "All Over", "detail_placement": "All Over".
+   - None: For solid plain t-shirts with no print -> "print_coverage": "None", "detail_placement": "None".
 
-pattern (1–3): Abstract | Animal Print | Applique | Cartoon | Checkered | Chevron/Zig Zag | Colorblock | Conversational | Diamante Print | Embroidered | Floral Print | Geometric Print | Graphic Print | Military Camouflage | Ombre | Polka Print | Printed | Self Design | Solid | Sporty | Striped | Superhero | Tie & Dye | Tribal Print | Typography | Washed | Washed/Ombre
+4. FIT & SILHOUETTE (fit_type):
+   - Evaluate the fit on the reference model:
+     * Oversized: Noticeable drop shoulder (seam rests 2-4 inches below the natural shoulder line), baggy/loose torso, wide roomy sleeves extending near or past the elbows -> "fit_type": "Oversized".
+     * Slim: Snug body-conscious fit, closely hugging the chest and arms -> "fit_type": "Slim".
+     * Regular: Shoulder seam aligns directly with the natural shoulder bone, standard straight body drape -> "fit_type": "Regular".
+     * Boxy: Wide, square torso cut with relaxed drape -> "fit_type": "Boxy".
 
-surface_styling (1–2 or "None"): Applique | Beads & Stones | Bow | Braids | Brand Logo | Buttons | Crochets & Schiffily | Cut-Outs | Cut-work | Epaulettes | Eyelets | Fringed | Knots | Laces | Mesh | Metal Embellishment | None | Patch Work | Pearl | Perforation | Piping Details | Pocket Flap | Pockets | Pompom | Ruffled | Sequins | Shimmer | Side Stripe | Statement Logo | Tassels | Thread Work | Tie-Ups | Twill Tape | Typography | Zipper Details
+5. COLLAR & SLEEVE (neck_type, sleeve_type):
+   - neck_type:
+     * "Round Neck" (standard circular rib collar; also accepted: "Crew Neck")
+     * "Polo Neck" (folded collar with 2-3 button placket)
+     * "V Neck" (V-shaped neckline)
+     * "Hooded Neck" (has an attached hood)
+     * "Henley Neck" (collarless round neck with button placket)
+   - sleeve_type:
+     * "Half Sleeve" (short sleeve ending between mid-bicep and elbow)
+     * "Full Sleeve" (long sleeve reaching wrist)
+     * "Sleeveless" (no sleeves / tank)
 
-detail_placement (1): All Over | Back Panel | Chest | Front Panel | Hemline | Hood | Neckline | None | Pocket | Side | Sleeve
+6. COLOR MAPPING (color, brand_color):
+   - color: MUST map to one of Flipkart's official primary color categories:
+     Black | White | Beige | Blue | Dark Blue | Navy Blue | Light Blue | Brown | Dark Green | Green | Grey | Maroon | Orange | Pink | Purple | Red | Yellow | Multicolor.
+     (Map Cream, Off-White, Ivory to "Beige" or "White"; map Charcoal to "Grey" or "Black").
+   - brand_color: The specific nuanced shade seen on the model (e.g. "Sage Green", "Charcoal Black", "Off White", "Dusty Lavender", "Mustard Yellow").
 
-tee_length (1): Crop | Long | Medium | Short
+7. MATERIAL & FABRIC (material):
+   - "100% Cotton", "Pure Cotton", or "Cotton Blend" for standard matte casual jersey t-shirts.
+   - "Polyester" or "Polycotton" for shiny athletic/dry-fit gym t-shirts.
 
-REFERENCE JSON STRUCTURE
+8. PRODUCT TITLE FORMULA (product_title):
+   - Structure: [ideal_for] [fit_type (if Oversized/Slim)] [pattern] [neck_type] [sleeve_type] T-Shirt
+   - Strict length: 35 to 65 characters, 5 to 8 words.
+   - Examples:
+     * "Men Oversized Graphic Printed Round Neck T-Shirt"
+     * "Women Oversized Graphic Printed Round Neck T-Shirt"
+     * "Men Regular Fit Solid Polo Neck Half Sleeve T-Shirt"
+     * "Women Typography Printed Round Neck Half Sleeve T-Shirt"
 
-Use the following example only as a structural template, not as a source of product facts. Replace every example-specific value with information supported by the uploaded image. Preserve all keys and their order.
+9. KEY FEATURES (key_features):
+   - Array of EXACTLY 10 strings formatted strictly as "Label: Value":
+     1. "Design: [Accurately describe what is visually printed on the t-shirt, e.g. Back Japanese Samurai Anime Graphic / Front Minimalist Typography / Solid Plain Tone]"
+     2. "Fit: [e.g. Modern Oversized Drop-Shoulder Streetwear Fit / Classic Regular Fit]"
+     3. "Neck: [e.g. Durable Ribbed Round Neckline / Ribbed Polo Collar]"
+     4. "Sleeve: [e.g. Relaxed Half Sleeves with Clean Finished Hems]"
+     5. "Fabric: [e.g. 100% Breathable Combed Cotton Jersey]"
+     6. "Color: [Primary color and exact shade description]"
+     7. "Style: [e.g. Urban Streetwear, Daily Casual & College Wear]"
+     8. "Gender: [Men / Women / Couple - strictly matching the model]"
+     9. "Occasion: [Casual Outings, Weekend Hangouts, Daily Wear]"
+     10. "Care Instructions: [Machine wash cold inside out, do not iron directly on print]"
 
+10. PRODUCT DESCRIPTION (product_description):
+    - Exactly 3 to 4 cohesive, engaging sentences (200 to 450 characters) summarizing the aesthetic, visual artwork, fabric comfort, fit silhouette, and styling recommendation (e.g. pairs well with cargo pants, denim, or shorts).
+
+11. STYLE CODE (style_code):
+    - Clean uppercase slug like: [GENDER]-[FIT]-[COLOR]-[KEYWORD]-01 (e.g. "MEN-OS-BLK-ANIME-01").
+
+ALLOWED VALUES REFERENCE:
+- ideal_for: Men | Women | Couple | Unisex
+- fit_type: Oversized | Regular | Slim | Boxy
+- neck_type: Round Neck | Crew Neck | Polo Neck | V Neck | Hooded Neck | Henley Neck
+- sleeve_type: Half Sleeve | Full Sleeve | Sleeveless | 3/4 Sleeve
+- pattern: Graphic Print | Typography | Solid | Striped | Colorblock | Printed | Tie & Dye | Abstract | Cartoon
+- material: 100% Cotton | Pure Cotton | Cotton Blend | Polyester | Polycotton
+- detail_placement: Chest | Front Panel | Back Panel | All Over | None
+- print_coverage: Chest | Full Front | Back | All Over | None
+- tee_length: Medium | Short | Long | Crop
+
+JSON OUTPUT STRUCTURE (Return ONLY valid JSON, no markdown formatting, no commentary):
 {
   "product_title": "",
   "product_description": "",
   "key_features": [
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-    ""
+    "Design: ...",
+    "Fit: ...",
+    "Neck: ...",
+    "Sleeve: ...",
+    "Fabric: ...",
+    "Color: ...",
+    "Style: ...",
+    "Gender: ...",
+    "Occasion: ...",
+    "Care Instructions: ..."
   ],
   "material": "",
   "pattern": "",
@@ -62,35 +123,13 @@ Use the following example only as a structural template, not as a source of prod
   "ideal_for": "",
   "color": "",
   "brand_color": "",
-  "occasion": "",
+  "occasion": "Casual",
   "style_code": "",
-  "description_override": "",
-  "search_keywords": "",
-  "key_features_sheet": "",
-  "fabric_care": "",
-  "surface_styling": "",
-  "tee_length": "",
+  "tee_length": "Medium",
   "print_coverage": "",
-  "sleeve_details": "",
   "detail_placement": "",
-  "detail_placement_rows": ["S","M","L","XL"]
-}
-
-DESCRIPTION_OVERRIDE RULES
-
-Build description_override from the generated product_title, product_description, and key_features, followed by the style, color, pattern, neckline, sleeve, occasion, and print-placement details in the same layout as the example. Keep it under 1000 characters. Ensure every value agrees with the other JSON fields. Do not retain example-specific details that contradict the reference image.
-
-FINAL VALIDATION
-- Return valid JSON only, with double-quoted keys and string values where applicable.
-- Include exactly the keys and order shown in the reference structure.
-- Include exactly 10 key_features and 4 "::"-separated search_keywords and key_features_sheet entries.
-- Use only allowed values for pattern, surface_styling, detail_placement, and tee_length.
-- Derive every product-specific attribute from the single uploaded image, not from the model's assumed gender, example defaults, or previous products.
-- Never force a fixed title, gender, sleeve length, fit, color, fabric, or neckline.
-- Do not invent details to fill missing visual information.
-
-TASK
-Analyze the single uploaded reference image and generate the complete Flipkart product listing JSON. The image is the only reference. Output JSON only.`;
+  "fabric_care": "Machine wash cold inside out, do not iron on print"
+}`;
 
 export const PromptDropdown: React.FC = () => {
   const [copied, setCopied] = useState(false);
