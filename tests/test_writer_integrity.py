@@ -58,3 +58,44 @@ def test_writer_preserves_macros_and_drawings(tmp_path):
             if member == sheet_path:
                 continue
             assert z_tpl.read(member) == z_out.read(member), f"Member {member} was altered!"
+
+
+def test_writer_rebuilds_native_xls(tmp_path):
+    template_path = str(FIXTURES_DIR / "blank_template.xlsm")
+    sheet = read_tshirt_sheet(str(FIXTURES_DIR / "1_before.xls"))
+    res = detect_designs(sheet)
+
+    batch_path = FIXTURES_DIR / "batch_1_to_2.json"
+    items = json.loads(batch_path.read_text(encoding="utf-8"))
+
+    mapper = get_default_mapper(template_path)
+    ready_rows = {}
+    existing_skus = set()
+    for d, it in zip(res.designs, items):
+        b_res = build_design_rows(d, it, mapper, existing_skus)
+        ready_rows[d.id] = b_res.rows
+
+    out_file = str(tmp_path / "output_test.xls")
+    out_path, report = rebuild_tshirt_workbook(
+        master_template_path=template_path,
+        output_path=out_file,
+        designs=res.designs,
+        ready_rows_map=ready_rows,
+    )
+
+    assert Path(out_path).exists()
+    assert report["status"] == "success"
+    assert report["format"] == "xls"
+    assert report["rows_written"] == 32
+
+    # Verify binary format: must be BIFF8 OLE2 binary, NOT a zip archive
+    with open(out_path, "rb") as f:
+        magic = f.read(8)
+    assert magic.startswith(b"\xd0\xcf\x11\xe0")
+    assert not zipfile.is_zipfile(out_path)
+
+    # Read back with read_tshirt_sheet
+    raw_sheet = read_tshirt_sheet(out_path)
+    assert len(raw_sheet.rows) == 32
+    det = detect_designs(raw_sheet)
+    assert len(det.designs) == 8

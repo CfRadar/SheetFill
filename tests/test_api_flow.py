@@ -5,6 +5,7 @@ from pathlib import Path
 import openpyxl
 from openpyxl.utils import get_column_letter
 import pytest
+import xlrd
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -52,14 +53,14 @@ def test_api_full_flow_compare_with_2_final():
     resp = client.get(download_url)
     assert resp.status_code == 200
 
-    out_file = Path("output") / f"api_test_out_{sid}.xlsm"
+    out_file = Path("output") / f"api_test_out_{sid}.xls"
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_bytes(resp.content)
 
     # 6. Column-by-column comparison with 2_final.xlsm rows 5..36
-    wb_out = openpyxl.load_workbook(str(out_file), data_only=True)
+    wb_out = xlrd.open_workbook(str(out_file))
     wb_exp = openpyxl.load_workbook(str(FIXTURES_DIR / "2_final.xlsm"), data_only=True)
-    sh_out = wb_out["t_shirt"]
+    sh_out = wb_out.sheet_by_name("t_shirt")
     sh_exp = wb_exp["t_shirt"]
 
     # Documented intentional differences:
@@ -84,10 +85,10 @@ def test_api_full_flow_compare_with_2_final():
             if col in intentional_columns:
                 continue
 
-            v_out = sh_out.cell(r, c).value
+            v_out = sh_out.cell_value(r - 1, c - 1)
             v_exp = sh_exp.cell(r, c).value
 
-            s_out = str(v_out).strip() if v_out is not None else ""
+            s_out = str(v_out).strip() if v_out is not None and v_out != "" else ""
             s_exp = str(v_exp).strip() if v_exp is not None else ""
 
             # Check numeric equivalence
@@ -104,17 +105,18 @@ def test_api_full_flow_compare_with_2_final():
 
     # Verify Col H groups: Design 1 (rows 5..8) -> group 1, Design 2 (rows 9..12) -> group 2
     for r in range(5, 9):
-        assert sh_out.cell(r, 8).value == "group 1"
-        assert sh_out.cell(r, 43).value == "tintin_os"
+        assert sh_out.cell_value(r - 1, 7) == "group 1"
+        assert sh_out.cell_value(r - 1, 42) == "tintin_os"
     for r in range(9, 13):
-        assert sh_out.cell(r, 8).value == "group 2"
-        assert sh_out.cell(r, 43).value == "caribbean girl_os"
+        assert sh_out.cell_value(r - 1, 7) == "group 2"
+        assert sh_out.cell_value(r - 1, 42) == "caribbean girl_os"
     for r in range(13, 17):
-        assert sh_out.cell(r, 8).value == "group 3"
+        assert sh_out.cell_value(r - 1, 7) == "group 3"
 
     # Verify Col AC (Packer details) is populated
     for r in range(5, 37):
-        assert sh_out.cell(r, 29).value is not None and str(sh_out.cell(r, 29).value).strip() != ""
+        val_ac = sh_out.cell_value(r - 1, 28)
+        assert val_ac is not None and str(val_ac).strip() != ""
 
 
 

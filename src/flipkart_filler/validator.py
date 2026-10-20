@@ -27,6 +27,19 @@ def verify_zip_integrity(
     t_path = Path(template_path)
     o_path = Path(output_path)
 
+    if o_path.suffix.lower() == ".xls" or not zipfile.is_zipfile(o_path):
+        with open(o_path, "rb") as f:
+            magic = f.read(8)
+        if not magic.startswith(b"\xd0\xcf\x11\xe0"):
+            issues.append(
+                ValidationIssue(
+                    level="ERROR",
+                    field="OLE2 Archive",
+                    message="Output file is not a valid BIFF8 OLE2 .xls workbook.",
+                )
+            )
+        return issues
+
     with zipfile.ZipFile(t_path, "r") as t_zip, zipfile.ZipFile(o_path, "r") as o_zip:
         sheet_path = resolve_sheet_path(t_zip, "t_shirt")
         o_namelist = o_zip.namelist()
@@ -102,23 +115,42 @@ def verify_workbook_content(
     - Length constraints (SKU <= 64, Description <= 10000, Brand Color <= 128)
     """
     issues: List[ValidationIssue] = []
+    import xlrd
 
-    t_wb = openpyxl.load_workbook(template_path, data_only=True, read_only=False)
-    f_target = open(output_path, "rb") if str(output_path).lower().endswith(".xls") else output_path
-    try:
-        o_wb = openpyxl.load_workbook(f_target, data_only=True, read_only=False)
-    finally:
-        if hasattr(f_target, "close"):
-            f_target.close()
+    t_path = Path(template_path)
+    o_path = Path(output_path)
+    is_t_xls = t_path.suffix.lower() == ".xls" or not zipfile.is_zipfile(t_path)
+    is_o_xls = o_path.suffix.lower() == ".xls" or not zipfile.is_zipfile(o_path)
 
-    t_ws = t_wb["t_shirt"]
-    o_ws = o_wb["t_shirt"]
+    if is_t_xls:
+        t_wb = xlrd.open_workbook(str(t_path), formatting_info=False)
+        t_ws = t_wb.sheet_by_name("t_shirt")
+        def get_t_val(r: int, c: int):
+            v = t_ws.cell_value(r - 1, c - 1)
+            return None if v == "" else v
+    else:
+        t_wb = openpyxl.load_workbook(t_path, data_only=True, read_only=False)
+        t_ws = t_wb["t_shirt"]
+        def get_t_val(r: int, c: int):
+            return t_ws.cell(row=r, column=c).value
+
+    if is_o_xls:
+        o_wb = xlrd.open_workbook(str(o_path), formatting_info=False)
+        o_ws = o_wb.sheet_by_name("t_shirt")
+        def get_o_val(r: int, c: int):
+            v = o_ws.cell_value(r - 1, c - 1)
+            return None if v == "" else v
+    else:
+        o_wb = openpyxl.load_workbook(o_path, data_only=True, read_only=False)
+        o_ws = o_wb["t_shirt"]
+        def get_o_val(r: int, c: int):
+            return o_ws.cell(row=r, column=c).value
 
     # 1. Rows 1-4 check
     for r in range(1, 5):
         for c in range(1, 69):
-            t_val = t_ws.cell(row=r, column=c).value
-            o_val = o_ws.cell(row=r, column=c).value
+            t_val = get_t_val(r, c)
+            o_val = get_o_val(r, c)
             if t_val != o_val:
                 col_letter = get_column_letter(c)
                 issues.append(
@@ -129,21 +161,22 @@ def verify_workbook_content(
                     )
                 )
 
-    # 2. Data validation count check via fast XML inspection
-    with zipfile.ZipFile(template_path, "r") as tz, zipfile.ZipFile(output_path, "r") as oz:
-        t_sheet = resolve_sheet_path(tz, "t_shirt")
-        o_sheet = resolve_sheet_path(oz, "t_shirt")
-        t_dv_count = len(re.findall(r"<dataValidation\b", tz.read(t_sheet).decode("utf-8")))
-        o_dv_count = len(re.findall(r"<dataValidation\b", oz.read(o_sheet).decode("utf-8")))
+    # 2. Data validation count check via fast XML inspection (for .xlsm)
+    if not is_t_xls and not is_o_xls:
+        with zipfile.ZipFile(template_path, "r") as tz, zipfile.ZipFile(output_path, "r") as oz:
+            t_sheet = resolve_sheet_path(tz, "t_shirt")
+            o_sheet = resolve_sheet_path(oz, "t_shirt")
+            t_dv_count = len(re.findall(r"<dataValidation\b", tz.read(t_sheet).decode("utf-8")))
+            o_dv_count = len(re.findall(r"<dataValidation\b", oz.read(o_sheet).decode("utf-8")))
 
-    if t_dv_count != o_dv_count:
-        issues.append(
-            ValidationIssue(
-                level="ERROR",
-                field="Data Validations",
-                message=f"Data validation count changed from {t_dv_count} to {o_dv_count}.",
+        if t_dv_count != o_dv_count:
+            issues.append(
+                ValidationIssue(
+                    level="ERROR",
+                    field="Data Validations",
+                    message=f"Data validation count changed from {t_dv_count} to {o_dv_count}.",
+                )
             )
-        )
 
     # 3. Check written rows if provided
     if expected_rows and start_row:
@@ -154,7 +187,7 @@ def verify_workbook_content(
 
             for col_letter, exp_val in expected_record.cells.items():
                 col_idx = openpyxl.utils.column_index_from_string(col_letter)
-                actual_val = o_ws.cell(row=r_num, column=col_idx).value
+                actual_val = get_o_val(r_num, col_idx)
 
                 # Check SKU constraints
                 if col_letter == "G":
@@ -248,7 +281,7 @@ def verify_workbook_content(
         matching_col_letters = ["BE", "AM", "BI", "BK", "BJ", "BG", "AG", "BH", "BC", "AP", "AN", "BF", "AH", "AJ", "AI", "BD", "AO", "AK", "AL"]
         rows_by_group: Dict[str, List[int]] = {}
         for r_num in range(start_row, start_row + len(expected_rows)):
-            grp_val = str(o_ws.cell(row=r_num, column=8).value or "").strip()
+            grp_val = str(get_o_val(r_num, 8) or "").strip()
             if grp_val:
                 rows_by_group.setdefault(grp_val, []).append(r_num)
 
@@ -258,9 +291,9 @@ def verify_workbook_content(
                 # Check matching attributes
                 for m_col in matching_col_letters:
                     col_idx = openpyxl.utils.column_index_from_string(m_col)
-                    p_val = str(o_ws.cell(row=parent_r, column=col_idx).value or "")
+                    p_val = str(get_o_val(parent_r, col_idx) or "")
                     for child_r in r_list[1:]:
-                        c_val = str(o_ws.cell(row=child_r, column=col_idx).value or "")
+                        c_val = str(get_o_val(child_r, col_idx) or "")
                         if p_val != c_val:
                             issues.append(
                                 ValidationIssue(
@@ -274,8 +307,8 @@ def verify_workbook_content(
                 color_idx = openpyxl.utils.column_index_from_string("AT")
                 seen_variants: Set[Tuple[str, str]] = set()
                 for r_num in r_list:
-                    s_val = str(o_ws.cell(row=r_num, column=size_idx).value or "").strip().lower()
-                    c_val = str(o_ws.cell(row=r_num, column=color_idx).value or "").strip().lower()
+                    s_val = str(get_o_val(r_num, size_idx) or "").strip().lower()
+                    c_val = str(get_o_val(r_num, color_idx) or "").strip().lower()
                     combo = (s_val, c_val)
                     if combo in seen_variants:
                         issues.append(
@@ -287,7 +320,9 @@ def verify_workbook_content(
                         )
                     seen_variants.add(combo)
 
-    t_wb.close()
-    o_wb.close()
+    if hasattr(t_wb, "close"):
+        t_wb.close()
+    if hasattr(o_wb, "close"):
+        o_wb.close()
 
     return issues

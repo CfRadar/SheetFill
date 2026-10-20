@@ -101,3 +101,30 @@ def test_cli_show_allowed():
     assert result.exit_code == 0
     assert "Beige" in result.output
     assert "Black" in result.output
+
+
+def test_cli_fill_xls_output(tmp_path):
+    output_xls = tmp_path / "output.xls"
+    xls_template = ROOT_DIR / "templates" / "Flipkart_TShirt_Template.xls"
+    shutil.copyfile(xls_template, output_xls)
+    json_path = FIXTURES_DIR / "moonlight.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "fill",
+            "--json",
+            str(json_path),
+            "--template",
+            str(xls_template),
+            "--append-to",
+            str(output_xls),
+            "--config",
+            str(CONFIG_DIR),
+        ],
+    )
+    assert result.exit_code == 0
+    assert output_xls.exists()
+    with open(output_xls, "rb") as f:
+        magic = f.read(8)
+    assert magic.startswith(b"\xd0\xcf\x11\xe0")

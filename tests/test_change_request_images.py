@@ -83,9 +83,9 @@ def test_1_upload_and_8_jsons_match_stubs_and_final_xlsm(client, tmp_path):
     wb2 = openpyxl.load_workbook(str(FINAL_XLSM), data_only=True, read_only=True)
     ws2 = wb2["t_shirt"]
 
-    # Read generated workbook
-    wb_gen = openpyxl.load_workbook(str(gen_file), data_only=True, read_only=True)
-    ws_gen = wb_gen["t_shirt"]
+    # Read generated workbook (.xls)
+    wb_gen = xlrd.open_workbook(str(gen_file))
+    ws_gen = wb_gen.sheet_by_name("t_shirt")
 
     # Compare rows 5..36 across all 8 designs
     for i in range(8):
@@ -95,10 +95,13 @@ def test_1_upload_and_8_jsons_match_stubs_and_final_xlsm(client, tmp_path):
 
         for offset in range(4):
             r_idx = 5 + i * 4 + offset
-            gen_sku = ws_gen[f"G{r_idx}"].value
+            gen_sku = ws_gen.cell_value(r_idx - 1, 6)
             assert gen_sku.startswith(base_sku.split("_")[0]), f"Unexpected SKU at row {r_idx}: {gen_sku}"
 
-            gen_imgs = [ws_gen[f"{col}{r_idx}"].value or "" for col in IMAGE_COLS]
+            gen_imgs = [
+                str(ws_gen.cell_value(r_idx - 1, openpyxl.utils.column_index_from_string(col) - 1) or "")
+                for col in IMAGE_COLS
+            ]
             final_imgs = [ws2[f"{col}{r_idx}"].value or "" for col in IMAGE_COLS]
 
             # Byte-for-byte string equality with 1.xls stub
@@ -111,7 +114,6 @@ def test_1_upload_and_8_jsons_match_stubs_and_final_xlsm(client, tmp_path):
             )
 
     wb2.close()
-    wb_gen.close()
 
 
 def test_2_cuteretro_os_az_blank_exactly_one_warning(client):

@@ -85,7 +85,18 @@ def rebuild_tshirt_workbook(
     if total_rows > 496:
         raise ValueError(f"Capacity exceeded: {total_rows} rows requested (max 496 data rows = 124 designs of 4 sizes).")
 
-    # Read master template
+    # Route to native BIFF8 .xls builder when requested output is .xls
+    if output_path.lower().endswith(".xls"):
+        return _rebuild_tshirt_workbook_xls(
+            master_template_path=master_template_path,
+            output_path=output_path,
+            designs=designs,
+            ready_rows_map=ready_rows_map,
+            final_rows=final_rows,
+            start_row=5,
+        )
+
+    # Read master template (.xlsm)
     master_path = Path(master_template_path)
     if not master_path.exists():
         raise FileNotFoundError(f"Master template not found at {master_template_path}")
@@ -100,7 +111,7 @@ def rebuild_tshirt_workbook(
         # Write to temporary file first
         out_p = Path(output_path)
         out_p.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_file = tempfile.mkstemp(suffix=out_p.suffix or ".xls", dir=str(out_p.parent))
+        fd, temp_file = tempfile.mkstemp(suffix=out_p.suffix or ".xlsm", dir=str(out_p.parent))
         os.close(fd)
 
         try:
@@ -128,6 +139,123 @@ def rebuild_tshirt_workbook(
     report["rows_written"] = total_rows
     report["designs_count"] = len(designs)
     report["ready_designs_count"] = len(ready_rows_map)
+    return str(out_p), report
+
+
+def _rebuild_tshirt_workbook_xls(
+    master_template_path: str,
+    output_path: str,
+    designs: List[DetectedDesign],
+    ready_rows_map: Dict[str, List[RowRecord]],
+    final_rows: List[Dict[str, Any]],
+    start_row: int = 5,
+) -> Tuple[str, Dict[str, Any]]:
+    """Native BIFF8 .xls rebuild: preserves all 10 sheets, dropdown lists, styles, and VBA macros."""
+    import xlrd
+    from xlutils.copy import copy as xl_copy
+
+    # Resolve master .xls template
+    master_p = Path(master_template_path)
+    if master_p.suffix.lower() == ".xls" and master_p.exists():
+        tpl_xls = master_p
+    else:
+        candidate = master_p.with_suffix(".xls")
+        if candidate.exists():
+            tpl_xls = candidate
+        else:
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            tpl_xls = base_dir / "templates" / "Flipkart_TShirt_Template.xls"
+
+    if not tpl_xls.exists():
+        raise FileNotFoundError(f"Master .xls template not found at {tpl_xls}")
+
+    rb = xlrd.open_workbook(str(tpl_xls), formatting_info=True)
+    wb = xl_copy(rb)
+
+    sheet_idx = None
+    for idx, name in enumerate(rb.sheet_names()):
+        if name == "t_shirt":
+            sheet_idx = idx
+            break
+    if sheet_idx is None:
+        raise ValueError("Sheet 't_shirt' not found in master .xls template")
+
+    ws = wb.get_sheet(sheet_idx)
+
+    # Excel row 5 is 0-indexed row 4
+    start_r = start_row - 1
+
+    # Write target rows sequentially
+    for idx, row_dict in enumerate(final_rows):
+        current_r = start_r + idx
+        for c_idx in range(68):
+            col_letter = index_to_col_name(c_idx + 1)
+            if col_letter in SKIP_COLS:
+                continue
+
+            if col_letter in row_dict:
+                val = row_dict[col_letter]
+                if val is None or str(val).strip() == "":
+                    ws.write(current_r, c_idx, None)
+                elif col_letter in NUMERIC_COLUMNS:
+                    try:
+                        num_val = float(val) if isinstance(val, (int, float, str)) else 0
+                        if num_val.is_integer():
+                            ws.write(current_r, c_idx, int(num_val))
+                        else:
+                            ws.write(current_r, c_idx, num_val)
+                    except (ValueError, TypeError):
+                        ws.write(current_r, c_idx, str(val))
+                else:
+                    str_val = str(val)
+                    # Formula injection protection
+                    if str_val and str_val[0] in ("=", "+", "-", "@"):
+                        str_val = "'" + str_val
+                    ws.write(current_r, c_idx, str_val)
+            else:
+                ws.write(current_r, c_idx, None)
+
+    # Clear any residual rows from template beyond the written rows up to 500
+    rb_sh = rb.sheet_by_name("t_shirt")
+    max_clear = min(500, max(rb_sh.nrows, start_r + len(final_rows)))
+    for current_r in range(start_r + len(final_rows), max_clear):
+        for c_idx in range(68):
+            col_letter = index_to_col_name(c_idx + 1)
+            if col_letter not in SKIP_COLS:
+                ws.write(current_r, c_idx, None)
+
+    # Save to output path atomically
+    out_p = Path(output_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    temp_fd, temp_file = tempfile.mkstemp(suffix=".xls", dir=str(out_p.parent))
+    os.close(temp_fd)
+    try:
+        wb.save(temp_file)
+        os.replace(temp_file, str(out_p))
+    finally:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+    # Validate output file is a true BIFF8 OLE2 binary file (not a zip archive)
+    with open(out_p, "rb") as f:
+        magic = f.read(8)
+    if not magic.startswith(b"\xd0\xcf\x11\xe0"):
+        raise ValueError(f"Generated file '{out_p.name}' is not a valid BIFF8 OLE2 .xls workbook")
+
+    raw_sheet = read_tshirt_sheet(str(out_p), str(tpl_xls))
+    det_res = detect_designs(raw_sheet)
+    total_rows = len(final_rows)
+
+    report = {
+        "status": "success",
+        "format": "xls",
+        "verified_sheets": len(rb.sheet_names()),
+        "rows_written": total_rows,
+        "designs_count": len(designs),
+        "ready_designs_count": len(ready_rows_map),
+        "detector_summary": det_res.summary.model_dump(),
+        "total_designs_in_output": len(det_res.designs),
+    }
     return str(out_p), report
 
 

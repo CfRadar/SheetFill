@@ -21,6 +21,17 @@ def load_allowed_values(template_path: Union[str, Path]) -> Dict[str, List[str]]
     if key_str in _ALLOWED_CACHE:
         return {k: list(v) for k, v in _ALLOWED_CACHE[key_str].items()}
 
+    t_path = Path(template_path)
+    if t_path.suffix.lower() == ".xls":
+        cand = t_path.with_suffix(".xlsm")
+        if cand.exists():
+            template_path = cand
+        else:
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            xlsm_cand = base_dir / "templates" / "Flipkart_TShirt_Template.xlsm"
+            if xlsm_cand.exists():
+                template_path = xlsm_cand
+
     wb = openpyxl.load_workbook(template_path, data_only=True)
     allowed: Dict[str, List[str]] = {}
 
@@ -135,8 +146,26 @@ def load_allowed_values(template_path: Union[str, Path]) -> Dict[str, List[str]]
 
 def read_existing_skus(workbook_path: Union[str, Path]) -> Set[str]:
     """Reads all existing Seller SKU IDs from column G (rows 5..500) of t_shirt."""
-    f_target = open(workbook_path, "rb") if str(workbook_path).lower().endswith(".xls") else workbook_path
+    import zipfile
+    import xlrd
+
+    w_path = Path(workbook_path)
     skus: Set[str] = set()
+
+    if w_path.suffix.lower() == ".xls" and not zipfile.is_zipfile(w_path):
+        wb = xlrd.open_workbook(str(w_path), formatting_info=False)
+        if "t_shirt" not in wb.sheet_names():
+            return skus
+        sh = wb.sheet_by_name("t_shirt")
+        for row in range(4, min(500, sh.nrows)):
+            val = sh.cell_value(row, 6)
+            if val is not None:
+                s_val = str(val).strip()
+                if s_val:
+                    skus.add(s_val)
+        return skus
+
+    f_target = open(workbook_path, "rb") if str(workbook_path).lower().endswith(".xls") else workbook_path
     try:
         wb = openpyxl.load_workbook(f_target, data_only=True, read_only=False)
         try:

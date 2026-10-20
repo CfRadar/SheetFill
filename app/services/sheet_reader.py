@@ -59,10 +59,21 @@ def _clean_cell_value(val: Any) -> Any:
 
 
 def get_master_headers(master_path: Optional[str] = None) -> Dict[str, str]:
-    """Reads header row 1 from the master template Flipkart_TShirt_Template.xlsm."""
+    """Reads header row 1 from the master template (.xlsm or .xls)."""
     if not master_path:
         base_dir = Path(__file__).resolve().parent.parent.parent
         master_path = str(base_dir / "templates" / "Flipkart_TShirt_Template.xlsm")
+
+    m_path = Path(master_path)
+    if m_path.suffix.lower() == ".xls":
+        wb_xls = xlrd.open_workbook(str(m_path), formatting_info=False)
+        sh = wb_xls.sheet_by_name("t_shirt")
+        headers = {}
+        for c in range(min(68, sh.ncols)):
+            col_letter = get_column_letter(c + 1)
+            hdr_val = sh.cell_value(0, c)
+            headers[col_letter] = str(hdr_val).strip() if hdr_val is not None else ""
+        return headers
 
     wb = openpyxl.load_workbook(master_path, read_only=True, data_only=True)
     try:

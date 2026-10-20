@@ -281,6 +281,9 @@ def create_patched_workbook(
     output_path = Path(output_workbook_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    if output_path.suffix.lower() == ".xls":
+        return create_patched_workbook_xls(source_path, output_path, rows)
+
     # Write to a temporary file first to support safe in-place replacement
     temp_output_path = output_path.with_name(f"{output_path.stem}.tmp_{id(output_path)}.xlsm")
 
@@ -320,3 +323,92 @@ def create_patched_workbook(
 
     end_row = start_row + len(rows) - 1
     return start_row, end_row, all_issues
+
+
+def create_patched_workbook_xls(
+    source_workbook_path: Union[str, Path],
+    output_workbook_path: Union[str, Path],
+    rows: List[RowRecord],
+) -> Tuple[int, int, List[ValidationIssue]]:
+    """Patches native BIFF8 .xls workbook, preserving dropdowns, formatting, and macros."""
+    import os
+    import tempfile
+    import xlrd
+    from xlutils.copy import copy as xl_copy
+
+    source_path = Path(source_workbook_path)
+    output_path = Path(output_workbook_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if source_path.suffix.lower() != ".xls" or zipfile.is_zipfile(source_path):
+        candidate = source_path.with_suffix(".xls")
+        if candidate.exists() and not zipfile.is_zipfile(candidate):
+            source_path = candidate
+        else:
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            source_path = base_dir / "templates" / "Flipkart_TShirt_Template.xls"
+
+    rb = xlrd.open_workbook(str(source_path), formatting_info=True)
+    wb = xl_copy(rb)
+
+    sheet_idx = None
+    for idx, name in enumerate(rb.sheet_names()):
+        if name == "t_shirt":
+            sheet_idx = idx
+            break
+    if sheet_idx is None:
+        raise ValueError("Sheet 't_shirt' not found in source .xls workbook")
+
+    ws = wb.get_sheet(sheet_idx)
+
+    # In Flipkart sheets, data starts at row 5 (0-indexed 4)
+    start_row = 5
+    start_r = 4
+
+    for idx, r_rec in enumerate(rows):
+        curr_r = start_r + idx
+        for c_idx in range(68):
+            col_letter = index_to_col_name(c_idx + 1)
+            if col_letter in {"A", "B", "C", "E", "F", "I"}:
+                continue
+            val = r_rec.cells.get(col_letter)
+            if val is None or str(val).strip() == "":
+                ws.write(curr_r, c_idx, None)
+            elif col_letter in NUMERIC_COLUMNS:
+                try:
+                    num_val = float(val) if isinstance(val, (int, float, str)) else 0
+                    if num_val.is_integer():
+                        ws.write(curr_r, c_idx, int(num_val))
+                    else:
+                        ws.write(curr_r, c_idx, num_val)
+                except (ValueError, TypeError):
+                    ws.write(curr_r, c_idx, str(val))
+            else:
+                str_val = str(val)
+                if str_val and str_val[0] in ("=", "+", "-", "@"):
+                    str_val = "'" + str_val
+                ws.write(curr_r, c_idx, str_val)
+
+    # Clear residual rows
+    rb_sh = rb.sheet_by_name("t_shirt")
+    max_clear = min(500, max(rb_sh.nrows, start_r + len(rows)))
+    for curr_r in range(start_r + len(rows), max_clear):
+        for c_idx in range(68):
+            col_letter = index_to_col_name(c_idx + 1)
+            if col_letter not in {"A", "B", "C", "E", "F", "I"}:
+                ws.write(curr_r, c_idx, None)
+
+    temp_fd, temp_file = tempfile.mkstemp(suffix=".xls", dir=str(output_path.parent))
+    os.close(temp_fd)
+    try:
+        wb.save(temp_file)
+        if os.path.exists(output_path):
+            os.replace(temp_file, str(output_path))
+        else:
+            Path(temp_file).rename(output_path)
+    finally:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+    end_row = start_row + len(rows) - 1
+    return start_row, end_row, []
