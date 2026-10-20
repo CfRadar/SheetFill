@@ -26,6 +26,7 @@ class ProductInput(BaseModel):
     selling_price: Optional[float] = None
     occasion: Optional[str] = None
     brand_color: Optional[str] = None
+    fabric_care: Optional[str] = None
 
 
 class RowRecord(BaseModel):

@@ -429,31 +429,25 @@ def build_design_rows(
     # Fabric Care (Col BH) - Matching Attribute: Canonicalize against allowed values
     allowed_care = mapper.allowed_values.get("fabric care", [])
     care_input = json_data.get("fabric_care") or design.existing_values.get("BH")
-    if care_input:
-        canonical_map = {v.lower(): v for v in allowed_care}
-        raw_items = [s.strip() for s in str(care_input).split("::") if s.strip()]
-        canonical_items = []
-        for it in raw_items:
-            if it.lower() in canonical_map:
-                canonical_items.append(canonical_map[it.lower()])
-            else:
-                canonical_items.append(it)
-        fabric_care_str = "::".join(canonical_items) if canonical_items else "Regular Machine Wash"
-    else:
-        prod_obj = ProductInput(
-            product_title=json_data.get("product_title", ""),
-            product_description=json_data.get("product_description", ""),
-            key_features=json_data.get("key_features", []),
-            material=fabric_input,
-            pattern=pattern_input,
-            sleeve_type=sleeve_input,
-            neck_type=neck_input,
-            fit_type=fit_input,
-            ideal_for=ideal_input,
-            color=color_input,
-            style_code=str(json_data.get("style_code", "")),
-        )
-        fabric_care_str = build_fabric_care(prod_obj, allowed_care_values=allowed_care)
+    prod_obj = ProductInput(
+        product_title=json_data.get("product_title", ""),
+        product_description=json_data.get("product_description", ""),
+        key_features=json_data.get("key_features", []),
+        material=fabric_input,
+        pattern=pattern_input,
+        sleeve_type=sleeve_input,
+        neck_type=neck_input,
+        fit_type=fit_input,
+        ideal_for=ideal_input,
+        color=color_input,
+        style_code=str(json_data.get("style_code", "")),
+        fabric_care=str(care_input) if care_input else None,
+    )
+    fabric_care_str = build_fabric_care(
+        prod_obj,
+        allowed_care_values=allowed_care,
+        raw_care_input=str(care_input) if care_input else None,
+    )
 
     # Brand Color (Col AT)
     bc_input = json_data.get("brand_color") or design.existing_values.get("AT") or color_input

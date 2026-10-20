@@ -187,53 +187,160 @@ def build_key_features(product: ProductInput) -> str:
     return "::".join(phrases[:6])
 
 
+def map_fabric_care_to_allowed(
+    care_input: Optional[str] = None,
+    allowed_care_values: Optional[List[str]] = None,
+    context_text: str = "",
+) -> str:
+    """Deterministically maps any raw fabric care input or text description to Flipkart's allowed canonical values.
+    
+    Guarantees:
+    - Every returned segment (joined by '::') strictly belongs to allowed_care_values.
+    - Zero invalid/free-form strings can ever pass to QC.
+    - Defaults to 'Regular Machine Wash' if no other valid care instruction is found.
+    """
+    default_allowed = [
+        "Cold water wash only",
+        "Do not Iron on print/embroidery/embellishment",
+        "Do not bleach",
+        "Do not dry clean",
+        "Do not iron",
+        "Do not steam iron",
+        "Do not tumble dry",
+        "Do not wring",
+        "Dry clean only",
+        "Dry flat",
+        "Dry in shade",
+        "First wash dry clean thereafter handwash",
+        "Gentle Machine Wash",
+        "Hand wash",
+        "Machine wash as per tag",
+        "Regular Machine Wash",
+        "Reverse and dry",
+        "Reverse and iron",
+        "Slight color may bleed in all washes",
+        "Slight color may bleed in first wash",
+        "Slight shrinkage would be expectedSlight shrinkage would be expected",
+        "Wash Separately",
+        "Wash with like colors",
+    ]
+    allowed = allowed_care_values or default_allowed
+    canonical_map = {v.lower().strip(): v for v in allowed}
+
+    selected_items: List[str] = []
+    combined = ""
+
+    if care_input and str(care_input).strip():
+        raw_str = str(care_input).strip()
+        # Direct check on exact match or parts split by ::, ,, ;, /
+        parts = [p.strip() for p in re.split(r"::|,|;|/", raw_str) if p.strip()]
+        for p in parts:
+            if p.lower() in canonical_map:
+                canon = canonical_map[p.lower()]
+                if canon not in selected_items:
+                    selected_items.append(canon)
+        combined = (raw_str + " " + context_text).lower()
+    else:
+        combined = context_text.lower()
+
+    # Rule-based semantic extraction from combined text for any missing categories
+    # 1. Base wash type
+    has_wash_type = any(
+        w in selected_items
+        for w in [
+            "Cold water wash only",
+            "Hand wash",
+            "Gentle Machine Wash",
+            "Dry clean only",
+            "Machine wash as per tag",
+            "Regular Machine Wash",
+            "First wash dry clean thereafter handwash",
+        ]
+    )
+    if not has_wash_type:
+        if "cold" in combined:
+            selected_items.insert(0, "Cold water wash only")
+        elif "hand wash" in combined or "handwash" in combined:
+            selected_items.insert(0, "Hand wash")
+        elif "gentle" in combined:
+            selected_items.insert(0, "Gentle Machine Wash")
+        elif "dry clean only" in combined:
+            selected_items.insert(0, "Dry clean only")
+        elif "machine wash as per tag" in combined:
+            selected_items.insert(0, "Machine wash as per tag")
+        else:
+            selected_items.insert(0, "Regular Machine Wash")
+
+    # 2. Ironing instructions
+    has_iron = any("iron" in w.lower() for w in selected_items)
+    if not has_iron:
+        if (
+            re.search(r"(?:do\s+not|avoid|never|no)\s+iron.*?(?:print|embroid|embellish)", combined)
+            or "iron on print" in combined
+            or "iron over print" in combined
+        ):
+            selected_items.append("Do not Iron on print/embroidery/embellishment")
+        elif "do not steam iron" in combined:
+            selected_items.append("Do not steam iron")
+        elif re.search(r"(?:do\s+not|no)\s+iron", combined):
+            selected_items.append("Do not iron")
+        elif "reverse and iron" in combined:
+            selected_items.append("Reverse and iron")
+
+    # 3. Drying & reverse
+    if "Reverse and dry" not in selected_items and ("inside out" in combined or "reverse" in combined):
+        selected_items.append("Reverse and dry")
+    if "Dry flat" not in selected_items and "dry flat" in combined:
+        selected_items.append("Dry flat")
+    if "Dry in shade" not in selected_items and "dry in shade" in combined:
+        selected_items.append("Dry in shade")
+    if "Do not tumble dry" not in selected_items and ("do not tumble dry" in combined or "no tumble dry" in combined):
+        selected_items.append("Do not tumble dry")
+    if "Do not wring" not in selected_items and ("do not wring" in combined or "no wring" in combined):
+        selected_items.append("Do not wring")
+
+    # 4. Bleach & colors
+    if "Do not bleach" not in selected_items and ("do not bleach" in combined or "no bleach" in combined):
+        selected_items.append("Do not bleach")
+    if "Wash with like colors" not in selected_items and ("like color" in combined or "similar color" in combined):
+        selected_items.append("Wash with like colors")
+    if "Wash Separately" not in selected_items and "separately" in combined:
+        selected_items.append("Wash Separately")
+    if "bleed" in combined:
+        bleed_val = "Slight color may bleed in first wash" if "first wash" in combined else "Slight color may bleed in all washes"
+        if bleed_val not in selected_items:
+            selected_items.append(bleed_val)
+
+    # STRICT CANONICAL MEMBERSHIP GUARD:
+    # Under no circumstances may an unapproved string be output
+    valid_items = [it for it in selected_items if it in allowed]
+    if not valid_items:
+        fallback = "Regular Machine Wash" if "Regular Machine Wash" in allowed else (allowed[0] if allowed else "")
+        valid_items = [fallback] if fallback else []
+
+    return "::".join(valid_items)
+
+
 def build_fabric_care(
     product: ProductInput,
     allowed_care_values: Optional[List[str]] = None,
+    raw_care_input: Optional[str] = None,
 ) -> str:
-    """'Regular Machine Wash' by default. Add:
-    'wash with similar/like colors'       -> 'Wash with like colors'
-    'avoid/do not iron over/on the print' -> 'Do not Iron on print/embroidery/embellishment'
-    'inside out'                          -> 'Reverse and dry'
-    'do not bleach'                       -> 'Do not bleach'
-    Join with '::'. All added values must match canonical values in allowed list.
+    """'Regular Machine Wash' by default. Maps all care instructions into canonical Flipkart values.
+    Join with '::'. All returned values strictly match canonical values in allowed list.
     """
-    care_items: List[str] = ["Regular Machine Wash"]
+    care_input = raw_care_input or getattr(product, "fabric_care", None)
 
-    # Gather care-related texts
+    # Gather care-related texts from description and key features
     parsed = parse_key_features(product.key_features)
     care_text = ""
     for k, v in parsed.items():
         if "care" in k.lower():
             care_text += " " + v
     care_text += " " + product.product_description
-    care_lower = care_text.lower()
 
-    mapping_rules = [
-        (r"(?:similar|like)\s+colors", "Wash with like colors"),
-        (
-            r"(?:avoid|do\s+not)\s+iron.*?(?:print|design|embroidery)",
-            "Do not Iron on print/embroidery/embellishment",
-        ),
-        (r"inside\s+out", "Reverse and dry"),
-        (r"do\s+not\s+bleach", "Do not bleach"),
-    ]
-
-    for pattern, canonical in mapping_rules:
-        if re.search(pattern, care_lower):
-            if canonical not in care_items:
-                care_items.append(canonical)
-
-    # Filter/canonicalize against allowed values if provided
-    if allowed_care_values:
-        canonical_map = {v.lower(): v for v in allowed_care_values}
-        final_items = []
-        for item in care_items:
-            if item.lower() in canonical_map:
-                final_items.append(canonical_map[item.lower()])
-            elif item in care_items[:1]:  # keep default if allowed
-                final_items.append(item)
-        if final_items:
-            return "::".join(final_items)
-
-    return "::".join(care_items)
+    return map_fabric_care_to_allowed(
+        care_input=care_input,
+        allowed_care_values=allowed_care_values,
+        context_text=care_text,
+    )

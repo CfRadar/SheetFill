@@ -142,10 +142,11 @@ async def get_version() -> Dict[str, Any]:
     """Public version endpoint returning build metadata and active feature set."""
     return {
         "status": "ok",
-        "version": "1.3.0",
-        "commit": "native-xls-biff8-v1.3",
+        "version": "1.3.1",
+        "commit": "native-xls-biff8-v1.3.1-fabric-care-qc-fix",
         "features": [
             "native_biff8_xls_engine",
+            "strict_canonical_fabric_care",
             "style_code_autofill_from_sku",
             "per_product_group_indexing",
             "global_brand_packer_manufacturer",
