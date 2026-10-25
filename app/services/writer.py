@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 from app.services.design_detector import DetectedDesign, detect_designs
 from app.services.sheet_reader import read_tshirt_sheet
 from flipkart_filler.models import RowRecord, ValidationIssue
-from flipkart_filler.rows import NUMERIC_COLUMNS
+from flipkart_filler.rows import NUMERIC_COLUMNS, SWEAT_NUMERIC_COLUMNS
 from flipkart_filler.xlsx_patch import MAIN_NS, NS_MAP, PKG_RELS_NS, resolve_sheet_path
 
 SKIP_COLS = {"A", "B", "C", "E", "F", "I"}
@@ -43,6 +43,7 @@ def rebuild_tshirt_workbook(
     ready_rows_map: Dict[str, List[RowRecord]],
     mode: str = "ready_only",
     original_sheet_rows: Optional[List[Dict[str, Any]]] = None,
+    product_type: str = "t_shirt",
 ) -> Tuple[str, Dict[str, Any]]:
     """Rebuilds data rows 5..N sequentially into master template without corruption."""
     # Check mode
@@ -94,6 +95,7 @@ def rebuild_tshirt_workbook(
             ready_rows_map=ready_rows_map,
             final_rows=final_rows,
             start_row=5,
+            product_type=product_type,
         )
 
     # Read master template (.xlsm)
@@ -101,12 +103,15 @@ def rebuild_tshirt_workbook(
     if not master_path.exists():
         raise FileNotFoundError(f"Master template not found at {master_template_path}")
 
+    target_sheet = "sweatshirt" if product_type == "sweatshirt" else "t_shirt"
+    numeric_cols = SWEAT_NUMERIC_COLUMNS if product_type == "sweatshirt" else NUMERIC_COLUMNS
+
     with zipfile.ZipFile(master_path, "r") as z_in:
-        sheet_path = resolve_sheet_path(z_in, "t_shirt")
+        sheet_path = resolve_sheet_path(z_in, target_sheet)
         sheet_xml = z_in.read(sheet_path)
 
         # Clear rows 5..500 and write final_rows sequentially starting at row 5
-        patched_sheet_xml = _clear_and_patch_sheet_xml(sheet_xml, final_rows, start_row=5)
+        patched_sheet_xml = _clear_and_patch_sheet_xml(sheet_xml, final_rows, start_row=5, numeric_cols=numeric_cols)
 
         # Write to temporary file first
         out_p = Path(output_path)
@@ -135,7 +140,7 @@ def rebuild_tshirt_workbook(
                 os.remove(temp_file)
 
     # Post-write verification
-    report = _verify_written_workbook(master_template_path, str(out_p), total_rows)
+    report = _verify_written_workbook(master_template_path, str(out_p), total_rows, product_type=product_type)
     report["rows_written"] = total_rows
     report["designs_count"] = len(designs)
     report["ready_designs_count"] = len(ready_rows_map)
@@ -149,10 +154,15 @@ def _rebuild_tshirt_workbook_xls(
     ready_rows_map: Dict[str, List[RowRecord]],
     final_rows: List[Dict[str, Any]],
     start_row: int = 5,
+    product_type: str = "t_shirt",
 ) -> Tuple[str, Dict[str, Any]]:
-    """Native BIFF8 .xls rebuild: preserves all 10 sheets, dropdown lists, styles, and VBA macros."""
+    """Native BIFF8 .xls rebuild: preserves all sheets, dropdown lists, styles, and VBA macros."""
     import xlrd
     from xlutils.copy import copy as xl_copy
+
+    target_sheet = "sweatshirt" if product_type == "sweatshirt" else "t_shirt"
+    default_tpl_name = "Flipkart_Sweatshirt_Template.xls" if product_type == "sweatshirt" else "Flipkart_TShirt_Template.xls"
+    numeric_cols = SWEAT_NUMERIC_COLUMNS if product_type == "sweatshirt" else NUMERIC_COLUMNS
 
     # Resolve master .xls template
     master_p = Path(master_template_path)
@@ -164,7 +174,7 @@ def _rebuild_tshirt_workbook_xls(
             tpl_xls = candidate
         else:
             base_dir = Path(__file__).resolve().parent.parent.parent
-            tpl_xls = base_dir / "templates" / "Flipkart_TShirt_Template.xls"
+            tpl_xls = base_dir / "templates" / default_tpl_name
 
     if not tpl_xls.exists():
         raise FileNotFoundError(f"Master .xls template not found at {tpl_xls}")
@@ -174,13 +184,15 @@ def _rebuild_tshirt_workbook_xls(
 
     sheet_idx = None
     for idx, name in enumerate(rb.sheet_names()):
-        if name == "t_shirt":
+        if name == target_sheet:
             sheet_idx = idx
             break
     if sheet_idx is None:
-        raise ValueError("Sheet 't_shirt' not found in master .xls template")
+        raise ValueError(f"Sheet '{target_sheet}' not found in master .xls template")
 
     ws = wb.get_sheet(sheet_idx)
+    rb_sh = rb.sheet_by_name(target_sheet)
+    ncols = rb_sh.ncols
 
     # Excel row 5 is 0-indexed row 4
     start_r = start_row - 1
@@ -188,7 +200,7 @@ def _rebuild_tshirt_workbook_xls(
     # Write target rows sequentially
     for idx, row_dict in enumerate(final_rows):
         current_r = start_r + idx
-        for c_idx in range(68):
+        for c_idx in range(ncols):
             col_letter = index_to_col_name(c_idx + 1)
             if col_letter in SKIP_COLS:
                 continue
@@ -197,7 +209,7 @@ def _rebuild_tshirt_workbook_xls(
                 val = row_dict[col_letter]
                 if val is None or str(val).strip() == "":
                     ws.write(current_r, c_idx, None)
-                elif col_letter in NUMERIC_COLUMNS:
+                elif col_letter in numeric_cols:
                     try:
                         num_val = float(val) if isinstance(val, (int, float, str)) else 0
                         if num_val.is_integer():
@@ -216,10 +228,9 @@ def _rebuild_tshirt_workbook_xls(
                 ws.write(current_r, c_idx, None)
 
     # Clear any residual rows from template beyond the written rows up to 500
-    rb_sh = rb.sheet_by_name("t_shirt")
     max_clear = min(500, max(rb_sh.nrows, start_r + len(final_rows)))
     for current_r in range(start_r + len(final_rows), max_clear):
-        for c_idx in range(68):
+        for c_idx in range(ncols):
             col_letter = index_to_col_name(c_idx + 1)
             if col_letter not in SKIP_COLS:
                 ws.write(current_r, c_idx, None)
@@ -263,8 +274,12 @@ def _clear_and_patch_sheet_xml(
     sheet_xml_bytes: bytes,
     rows_data: List[Dict[str, Any]],
     start_row: int = 5,
+    numeric_cols: Optional[Set[str]] = None,
 ) -> bytes:
-    """Clears cells A..BP in rows 5..500, then writes rows_data into rows 5..5+len-1."""
+    """Clears cells in rows 5..500, then writes rows_data into rows 5..5+len-1."""
+    if numeric_cols is None:
+        numeric_cols = NUMERIC_COLUMNS
+
     root = ET.fromstring(sheet_xml_bytes)
     sheet_data = root.find(f"{{{MAIN_NS}}}sheetData")
     if sheet_data is None:
@@ -336,7 +351,7 @@ def _clear_and_patch_sheet_xml(
                 c_elem.remove(ch)
 
             # Check numeric vs string
-            if col_letter in NUMERIC_COLUMNS:
+            if col_letter in numeric_cols:
                 try:
                     num_val = float(val) if isinstance(val, (int, float, str)) else 0
                     if num_val.is_integer():
@@ -371,10 +386,11 @@ def _clear_and_patch_sheet_xml(
     return ET.tostring(root, xml_declaration=True, encoding="utf-8", standalone=True)
 
 
-def _verify_written_workbook(template_path: str, output_path: str, rows_written: int) -> Dict[str, Any]:
+def _verify_written_workbook(template_path: str, output_path: str, rows_written: int, product_type: str = "t_shirt") -> Dict[str, Any]:
     """Runs post-write integrity assertions."""
+    target_sheet = "sweatshirt" if product_type == "sweatshirt" else "t_shirt"
     with zipfile.ZipFile(template_path, "r") as z_tpl, zipfile.ZipFile(output_path, "r") as z_out:
-        sheet_path = resolve_sheet_path(z_tpl, "t_shirt")
+        sheet_path = resolve_sheet_path(z_tpl, target_sheet)
         mismatched_parts = []
         for name in z_tpl.namelist():
             if name == sheet_path:

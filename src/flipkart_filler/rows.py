@@ -13,6 +13,7 @@ from .text_builders import (
 )
 
 NUMERIC_COLUMNS: Set[str] = {"K", "L", "O", "P", "R", "S", "T", "U", "V", "W", "X", "Z", "AN"}
+SWEAT_NUMERIC_COLUMNS: Set[str] = {"K", "L", "O", "P", "R", "S", "T", "U", "V", "W", "X", "Z", "AH"}
 
 
 def determine_sku_base(product: ProductInput, source_sheet_data: Optional[Dict[str, Any]] = None) -> str:
@@ -39,6 +40,7 @@ def build_product_rows(
     existing_skus: Set[str],
     source_sheet_data: Optional[Dict[str, Any]] = None,
     product_index: Optional[int] = None,
+    product_type: str = "t_shirt",
 ) -> Tuple[List[RowRecord], List[ValidationIssue]]:
     """Generates 4 rows (one per size) for a product, validating attributes and constraints.
     Returns (list_of_4_RowRecords, list_of_issues).
@@ -79,9 +81,12 @@ def build_product_rows(
             )
         )
 
-    mapped_fit, fit_issue = mapper.map_attribute("fit", product.fit_type)
-    if fit_issue:
-        issues.append(fit_issue)
+    if product_type == "sweatshirt":
+        mapped_fit = product.fit_type or "Regular"
+    else:
+        mapped_fit, fit_issue = mapper.map_attribute("fit", product.fit_type)
+        if fit_issue:
+            issues.append(fit_issue)
 
     mapped_color, color_issue = mapper.map_attribute("color", product.color, allow_multi=True)
     if color_issue:
@@ -142,7 +147,12 @@ def build_product_rows(
     sizes = product.sizes or mapper.defaults.get("sizes", ["S", "M", "L", "XL"])
 
     # Validate / extract source sheet images
-    img_cols = ["AU", "AV", "AW", "AX", "AY", "AZ", "BA"]
+    if product_type == "sweatshirt":
+        img_cols = ["AX", "AY", "AZ", "BA", "BB"]
+        extra_stub_cols = ["BC", "BM", "CA", "D"]
+    else:
+        img_cols = ["AU", "AV", "AW", "AX", "AY", "AZ", "BA"]
+        extra_stub_cols = ["BB", "BI", "BP", "D"]
     final_sheet_cells: Dict[str, str] = {}
 
     if source_sheet_data is None:
@@ -150,7 +160,7 @@ def build_product_rows(
             ValidationIssue(
                 level="WARNING",
                 field="images",
-                message=f"No source sheet provided. Image columns AU..BA will remain blank for {sku_base}.",
+                message=f"No source sheet provided. Image columns will remain blank for {sku_base}.",
             )
         )
     else:
@@ -176,8 +186,8 @@ def build_product_rows(
                     )
                 final_sheet_cells[col] = val_str
 
-        # Extra columns from stub if non-empty: BB, BI, BP, D
-        for extra_col in ["BB", "BI", "BP", "D"]:
+        # Extra columns from stub if non-empty
+        for extra_col in extra_stub_cols:
             extra_val = source_sheet_data.get(extra_col)
             if extra_val is not None and str(extra_val) != "":
                 final_sheet_cells[extra_col] = str(extra_val)
@@ -228,62 +238,122 @@ def build_product_rows(
         packer_val = str(defaults.get("packer", mfg_val))
         brand_val = str(defaults.get("brand", "fashion continental"))
 
-        cells: Dict[str, Any] = {
-            "G": sku,
-            "H": group_val,
-            "J": str(defaults.get("listing_status", "Active")),
-            "K": mrp_val,
-            "L": sp_val,
-            "M": str(defaults.get("fulfilment_by", "Seller")),
-            "N": str(defaults.get("procurement_type", "instock")),
-            "O": int(defaults.get("procurement_sla_days", 2)),
-            "P": int(defaults.get("stock", 2000)),
-            "Q": str(defaults.get("shipping_provider", "Flipkart")),
-            "R": float(handling.get("local", 0)),
-            "S": float(handling.get("zonal", 0)),
-            "T": float(handling.get("national", 0)),
-            "U": float(pkg.get("length", 25)),
-            "V": float(pkg.get("breadth", 20)),
-            "W": float(pkg.get("height", 3)),
-            "X": float(defaults.get("weight_kg", 0.222)),
-            "Y": hsn_val,
-            "Z": float(defaults.get("luxury_cess", 0)),
-            "AA": str(defaults.get("country_of_origin", "India")),
-            "AB": mfg_val,
-            "AC": packer_val,
-            "AE": str(defaults.get("tax_code", "GST_APPAREL")),
-            # AF empty
-            "AG": brand_val,
-            "AH": mapped_neck,
-            "AI": mapped_pattern,
-            "AJ": mapped_fabric,
-            "AK": mapped_ideal_for,
-            "AL": mapped_sleeve,
-            "AM": mapped_occ,
-            "AN": int(defaults.get("pack_of", 1)),
-            "AO": mapped_fit,
-            "AP": str(defaults.get("suitable_for", "Western Wear")),
-            "AQ": str(product.style_code or "").strip() or sku_base,
-            "AR": size,
-            "AS": mapped_color,
-            "AT": brand_color_val,
-            # AU..BA: images
-            "BD": detail_placement,
-            "BE": str(defaults.get("print_coverage", "Chest")),
-            "BF": str(defaults.get("tee_length", "Medium")),
-            "BG": str(defaults.get("reversible", "No")),
-            "BH": fabric_care,
-            # BI empty
-            "BJ": surface_styling,
-            "BK": str(defaults.get("sleeve_details", "No Details")),
-            # BL empty
-            "BM": description,
-            "BN": search_keywords,
-            "BO": key_features,
-            # BP empty
-        }
+        if product_type == "sweatshirt":
+            cells: Dict[str, Any] = {
+                "G": sku,
+                "H": group_val,
+                "J": str(defaults.get("listing_status", "Active")),
+                "K": mrp_val,
+                "L": sp_val,
+                "M": str(defaults.get("fulfilment_by", "Seller")),
+                "N": str(defaults.get("procurement_type", "instock")),
+                "O": int(defaults.get("procurement_sla_days", 2)),
+                "P": int(defaults.get("stock", 2000)),
+                "Q": str(defaults.get("shipping_provider", "Flipkart")),
+                "R": float(handling.get("local", 0)),
+                "S": float(handling.get("zonal", 0)),
+                "T": float(handling.get("national", 0)),
+                "U": float(pkg.get("length", 30)),
+                "V": float(pkg.get("breadth", 25)),
+                "W": float(pkg.get("height", 4)),
+                "X": float(defaults.get("weight_kg", 0.45)),
+                "Y": hsn_val,
+                "Z": float(defaults.get("luxury_cess", 0)),
+                "AA": str(defaults.get("country_of_origin", "India")),
+                "AB": mfg_val,
+                "AC": packer_val,
+                "AE": str(defaults.get("tax_code", "GST_APPAREL")),
+                "AG": brand_val,
+                "AH": int(defaults.get("pack_of", 1)),
+                "AI": mapped_fabric,
+                "AJ": mapped_pattern,
+                "AK": str(defaults.get("reversible", "No")),
+                "AL": mapped_sleeve,
+                "AM": mapped_ideal_for,
+                "AN": fabric_care,
+                "AO": str(defaults.get("hooded", "No")),
+                "AP": str(defaults.get("closure", "No Closure")),
+                "AQ": mapped_neck,
+                "AR": str(defaults.get("suitable_for", "Western Wear")),
+                "AS": size,
+                "AT": "",
+                "AU": str(product.style_code or "").strip() or sku_base,
+                "AV": mapped_color,
+                "AW": brand_color_val,
+                "BD": str(defaults.get("character", "None")),
+                "BE": "",
+                "BF": mapped_pattern,
+                "BG": detail_placement,
+                "BH": "",
+                "BI": "",
+                "BJ": mapped_occ,
+                "BK": "",
+                "BL": str(defaults.get("items_included", "1 Sweatshirt")),
+                "BQ": "",
+                "BR": surface_styling,
+                "BS": str(defaults.get("sleeve_details", "Cuffed")),
+                "BT": str(defaults.get("winter_type", "Heavy Winter")),
+                "BW": description,
+                "BX": search_keywords,
+                "BY": key_features,
+            }
+        else:
+            cells: Dict[str, Any] = {
+                "G": sku,
+                "H": group_val,
+                "J": str(defaults.get("listing_status", "Active")),
+                "K": mrp_val,
+                "L": sp_val,
+                "M": str(defaults.get("fulfilment_by", "Seller")),
+                "N": str(defaults.get("procurement_type", "instock")),
+                "O": int(defaults.get("procurement_sla_days", 2)),
+                "P": int(defaults.get("stock", 2000)),
+                "Q": str(defaults.get("shipping_provider", "Flipkart")),
+                "R": float(handling.get("local", 0)),
+                "S": float(handling.get("zonal", 0)),
+                "T": float(handling.get("national", 0)),
+                "U": float(pkg.get("length", 25)),
+                "V": float(pkg.get("breadth", 20)),
+                "W": float(pkg.get("height", 3)),
+                "X": float(defaults.get("weight_kg", 0.222)),
+                "Y": hsn_val,
+                "Z": float(defaults.get("luxury_cess", 0)),
+                "AA": str(defaults.get("country_of_origin", "India")),
+                "AB": mfg_val,
+                "AC": packer_val,
+                "AE": str(defaults.get("tax_code", "GST_APPAREL")),
+                # AF empty
+                "AG": brand_val,
+                "AH": mapped_neck,
+                "AI": mapped_pattern,
+                "AJ": mapped_fabric,
+                "AK": mapped_ideal_for,
+                "AL": mapped_sleeve,
+                "AM": mapped_occ,
+                "AN": int(defaults.get("pack_of", 1)),
+                "AO": mapped_fit,
+                "AP": str(defaults.get("suitable_for", "Western Wear")),
+                "AQ": str(product.style_code or "").strip() or sku_base,
+                "AR": size,
+                "AS": mapped_color,
+                "AT": brand_color_val,
+                # AU..BA: images
+                "BD": detail_placement,
+                "BE": str(defaults.get("print_coverage", "Chest")),
+                "BF": str(defaults.get("tee_length", "Medium")),
+                "BG": str(defaults.get("reversible", "No")),
+                "BH": fabric_care,
+                # BI empty
+                "BJ": surface_styling,
+                "BK": str(defaults.get("sleeve_details", "No Details")),
+                # BL empty
+                "BM": description,
+                "BN": search_keywords,
+                "BO": key_features,
+                # BP empty
+            }
 
-        # Populate images AU..BA and extra stub cells BB, BI, BP, D
+        # Populate images and extra stub cells
         for c_key, c_val in final_sheet_cells.items():
             cells[c_key] = c_val
 

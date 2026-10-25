@@ -43,8 +43,10 @@ router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
 store = DesignStore()
 
 
-def _get_master_template_path() -> str:
+def _get_master_template_path(product_type: str = "t_shirt") -> str:
     base_dir = Path(__file__).resolve().parent.parent.parent
+    if product_type == "sweatshirt":
+        return str(base_dir / "templates" / "Flipkart_Sweatshirt_Template.xls")
     return str(base_dir / "templates" / "Flipkart_TShirt_Template.xlsm")
 
 
@@ -56,8 +58,12 @@ def _json_error(status_code: int, code: str, message: str, details: Any = None) 
 
 
 @router.get("/allowed-values/{attribute}")
-def get_allowed_values(attribute: str, user: CurrentUser = Depends(require_user)) -> Dict[str, Any]:
-    master_path = _get_master_template_path()
+def get_allowed_values(
+    attribute: str,
+    product_type: str = Query("t_shirt"),
+    user: CurrentUser = Depends(require_user),
+) -> Dict[str, Any]:
+    master_path = _get_master_template_path(product_type)
     allowed_map = load_allowed_values(master_path)
     attr_lower = attribute.lower().strip()
     vals = allowed_map.get(attr_lower, [])
@@ -105,14 +111,21 @@ async def analyze_sheet(
             f.write(contents)
 
         try:
-            raw_sheet = read_tshirt_sheet(str(temp_file), _get_master_template_path())
+            raw_sheet = read_tshirt_sheet(str(temp_file))
         except ValueError as ve:
             return _json_error(400, "SHEET_READ_ERROR", str(ve))
         except Exception as e:
             return _json_error(400, "UNREADABLE_FILE", f"Could not read workbook: {str(e)}")
 
         detection_res = detect_designs(raw_sheet)
-        session = store.create_session(filename, contents, detection_res, user_id=user.id)
+        session = store.create_session(
+            filename,
+            contents,
+            detection_res,
+            user_id=user.id,
+            sheet_name=raw_sheet.sheet_name,
+            product_type=raw_sheet.product_type,
+        )
         if user.brand_defaults:
             session.global_meta = dict(user.brand_defaults)
             for d in session.designs:
@@ -124,7 +137,7 @@ async def analyze_sheet(
             user=user,
             request=request,
             session_id=session.session_id,
-            meta={"filename": filename, "designs_count": len(session.designs)},
+            meta={"filename": filename, "designs_count": len(session.designs), "product_type": session.product_type},
         )
 
         return AnalyzeResponse(
@@ -132,6 +145,8 @@ async def analyze_sheet(
             filename=filename,
             summary=session.summary,
             designs=session.designs,
+            product_type=session.product_type,
+            sheet_name=session.sheet_name,
         )
     finally:
         if temp_file.exists():
@@ -176,6 +191,8 @@ def get_session_state(sid: str, user: CurrentUser = Depends(require_user)) -> An
         design_product_links=session.design_product_links,
         design_meta=session.design_meta,
         global_meta=session.global_meta,
+        product_type=getattr(session, "product_type", "t_shirt"),
+        sheet_name=getattr(session, "sheet_name", "t_shirt"),
         download_url=download_url,
         output_filename=session.output_filename,
         report=session.report,
@@ -291,7 +308,8 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest, user: CurrentUser =
         )
 
     # Mapper & builder
-    mapper = get_default_mapper(_get_master_template_path())
+    product_type = getattr(session, "product_type", "t_shirt")
+    mapper = get_default_mapper(_get_master_template_path(product_type), product_type=product_type)
 
     # Collect existing SKUs in session from other designs
     existing_skus = set()
@@ -316,6 +334,7 @@ def put_design_json(sid: str, did: str, req: PutJsonRequest, user: CurrentUser =
         product_link_edit=prod_link_edit,
         meta_override=meta_override,
         design_index=target_idx,
+        product_type=product_type,
     )
 
     # Save to store
@@ -395,7 +414,8 @@ def put_design_sizes(
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
-    master_path = _get_master_template_path()
+    product_type = getattr(session, "product_type", "t_shirt")
+    master_path = _get_master_template_path(product_type)
     allowed_sizes = load_allowed_values(master_path).get("brand size", ["S", "M", "L", "XL"])
     for s in req.sizes:
         if not any(s.strip().lower() == a.lower() for a in allowed_sizes):
@@ -408,7 +428,7 @@ def put_design_sizes(
     target_design = next((d for d in updated.designs if d.id == did), None)
     preview_rows = []
     if target_design and did in updated.design_jsons:
-        mapper = get_default_mapper(_get_master_template_path())
+        mapper = get_default_mapper(master_path, product_type=product_type)
         meta_override = dict(updated.global_meta or {})
         meta_override.update(updated.design_meta.get(did, {}))
         target_idx = next((i + 1 for i, d in enumerate(updated.designs) if d.id == did), 1)
@@ -422,6 +442,7 @@ def put_design_sizes(
             product_link_edit=updated.design_product_links.get(did),
             meta_override=meta_override,
             design_index=target_idx,
+            product_type=product_type,
         )
         store.save_design_json(
             session_id=sid,
@@ -480,7 +501,8 @@ def put_design_meta(
     # Re-evaluate design status if json exists
     preview_rows = []
     if did in updated.design_jsons:
-        mapper = get_default_mapper(_get_master_template_path())
+        product_type = getattr(updated, "product_type", "t_shirt")
+        mapper = get_default_mapper(_get_master_template_path(product_type), product_type=product_type)
         meta_override = dict(updated.global_meta or {})
         meta_override.update(updated.design_meta.get(did, {}))
         target_idx = next((i + 1 for i, d in enumerate(updated.designs) if d.id == did), 1)
@@ -494,6 +516,7 @@ def put_design_meta(
             product_link_edit=updated.design_product_links.get(did),
             meta_override=meta_override,
             design_index=target_idx,
+            product_type=product_type,
         )
         store.save_design_json(
             session_id=sid,
@@ -573,7 +596,8 @@ def apply_meta_all(
             pass
 
     # Re-evaluate all designs that have JSON
-    mapper = get_default_mapper(_get_master_template_path())
+    product_type = getattr(updated, "product_type", "t_shirt")
+    mapper = get_default_mapper(_get_master_template_path(product_type), product_type=product_type)
     for idx, d in enumerate(updated.designs, start=1):
         if d.id in updated.design_jsons:
             meta_override = dict(updated.global_meta or {})
@@ -588,6 +612,7 @@ def apply_meta_all(
                 product_link_edit=updated.design_product_links.get(d.id),
                 meta_override=meta_override,
                 design_index=idx,
+                product_type=product_type,
             )
             store.save_design_json(
                 session_id=sid,
@@ -620,6 +645,8 @@ def apply_meta_all(
         design_product_links=refreshed.design_product_links,
         design_meta=refreshed.design_meta,
         global_meta=refreshed.global_meta,
+        product_type=getattr(refreshed, "product_type", "t_shirt"),
+        sheet_name=getattr(refreshed, "sheet_name", "t_shirt"),
         download_url=download_url,
         output_filename=refreshed.output_filename,
         report=refreshed.report,
@@ -668,7 +695,8 @@ def bulk_confirm(
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
-    mapper = get_default_mapper(_get_master_template_path())
+    product_type = getattr(session, "product_type", "t_shirt")
+    mapper = get_default_mapper(_get_master_template_path(product_type), product_type=product_type)
     applied = []
     errors = []
 
@@ -694,6 +722,7 @@ def bulk_confirm(
             product_link_edit=session.design_product_links.get(did),
             meta_override=meta_override,
             design_index=target_idx,
+            product_type=product_type,
         )
 
         store.save_design_json(
@@ -722,27 +751,52 @@ def get_json_template(sid: str, did: str, user: CurrentUser = Depends(require_us
     if not target:
         return _json_error(404, "DESIGN_NOT_FOUND", f"Design '{did}' not found")
 
-    skeleton = {
-        "product_title": "",
-        "product_description": "",
-        "key_features": [
-            "Premium cotton fabric",
-            "Graphic print design",
-            "Comfortable fit for everyday wear",
-        ],
-        "material": target.existing_values.get("AJ", "Cotton Blend"),
-        "pattern": target.existing_values.get("AI", "Graphic Print"),
-        "sleeve_type": target.existing_values.get("AL", "Half Sleeve"),
-        "neck_type": target.existing_values.get("AH", "Round Neck"),
-        "fit_type": target.existing_values.get("AO", "Regular"),
-        "ideal_for": target.existing_values.get("AK", "Men"),
-        "color": target.existing_values.get("AS", "Black"),
-        "brand_color": target.existing_values.get("AT", "Black"),
-        "style_code": target.existing_values.get("AQ", ""),
-        "mrp": float(target.existing_values.get("K", 1999)),
-        "selling_price": float(target.existing_values.get("L", 749)),
-        "occasion": target.existing_values.get("AM", "Casual"),
-    }
+    product_type = getattr(session, "product_type", "t_shirt")
+    if product_type == "sweatshirt":
+        skeleton = {
+            "product_title": "",
+            "product_description": "",
+            "key_features": [
+                "Premium fleece fabric",
+                "Graphic print design",
+                "Warm and comfortable for winter wear",
+            ],
+            "material": target.existing_values.get("AI", "Fleece"),
+            "pattern": target.existing_values.get("AJ", "Graphic Print"),
+            "sleeve_type": target.existing_values.get("AL", "Full Sleeve"),
+            "neck_type": target.existing_values.get("AQ", "Hooded Neck"),
+            "closure": target.existing_values.get("AP", "No Closure"),
+            "hooded": target.existing_values.get("AO", "Yes"),
+            "ideal_for": target.existing_values.get("AM", "Men"),
+            "color": target.existing_values.get("AV", "Black"),
+            "brand_color": target.existing_values.get("AW", "Black"),
+            "style_code": target.existing_values.get("AU", ""),
+            "mrp": float(target.existing_values.get("K", 2499)),
+            "selling_price": float(target.existing_values.get("L", 999)),
+            "occasion": target.existing_values.get("BJ", "Casual"),
+        }
+    else:
+        skeleton = {
+            "product_title": "",
+            "product_description": "",
+            "key_features": [
+                "Premium cotton fabric",
+                "Graphic print design",
+                "Comfortable fit for everyday wear",
+            ],
+            "material": target.existing_values.get("AJ", "Cotton Blend"),
+            "pattern": target.existing_values.get("AI", "Graphic Print"),
+            "sleeve_type": target.existing_values.get("AL", "Half Sleeve"),
+            "neck_type": target.existing_values.get("AH", "Round Neck"),
+            "fit_type": target.existing_values.get("AO", "Regular"),
+            "ideal_for": target.existing_values.get("AK", "Men"),
+            "color": target.existing_values.get("AS", "Black"),
+            "brand_color": target.existing_values.get("AT", "Black"),
+            "style_code": target.existing_values.get("AQ", ""),
+            "mrp": float(target.existing_values.get("K", 1999)),
+            "selling_price": float(target.existing_values.get("L", 749)),
+            "occasion": target.existing_values.get("AM", "Casual"),
+        }
     return skeleton
 
 
@@ -757,7 +811,8 @@ async def generate_workbook(
     if not session:
         return _json_error(404, "SESSION_NOT_FOUND", f"Session '{sid}' not found")
 
-    mapper = get_default_mapper(_get_master_template_path())
+    product_type = getattr(session, "product_type", "t_shirt")
+    mapper = get_default_mapper(_get_master_template_path(product_type), product_type=product_type)
 
     # Build ready rows map
     ready_rows_map: Dict[str, List] = {}
@@ -780,6 +835,7 @@ async def generate_workbook(
                 product_link_edit=session.design_product_links.get(d.id),
                 meta_override=meta_override,
                 design_index=idx,
+                product_type=product_type,
             )
             if b_res.status == "ready":
                 ready_rows_map[d.id] = b_res.rows
@@ -809,11 +865,12 @@ async def generate_workbook(
     try:
         out_file, report = await asyncio.to_thread(
             rebuild_tshirt_workbook,
-            master_template_path=_get_master_template_path(),
+            master_template_path=_get_master_template_path(product_type),
             output_path=str(out_path),
             designs=session.designs,
             ready_rows_map=ready_rows_map,
             mode=req.mode,
+            product_type=product_type,
         )
     except ValueError as ve:
         return _json_error(400, "GENERATION_ERROR", str(ve))
@@ -864,7 +921,8 @@ async def download_workbook(
     # Auto-regenerate on demand if missing from disk (e.g. server restart or ephemeral container)
     if not fpath or not fpath.exists():
         try:
-            mapper = get_default_mapper()
+            product_type = getattr(session, "product_type", "t_shirt")
+            mapper = get_default_mapper(_get_master_template_path(product_type), product_type=product_type)
             existing_skus: Set[str] = set()
             ready_rows_map: Dict[str, Any] = {}
             for idx, d in enumerate(session.designs, start=1):
@@ -882,6 +940,7 @@ async def download_workbook(
                         product_link_edit=session.design_product_links.get(d.id),
                         meta_override=meta_override,
                         design_index=idx,
+                        product_type=product_type,
                     )
                     if b_res.status == "ready":
                         ready_rows_map[d.id] = b_res.rows
@@ -891,11 +950,12 @@ async def download_workbook(
                 gen_path = sdir / gen_name
                 out_file, report = await asyncio.to_thread(
                     rebuild_tshirt_workbook,
-                    master_template_path=_get_master_template_path(),
+                    master_template_path=_get_master_template_path(product_type),
                     output_path=str(gen_path),
                     designs=session.designs,
                     ready_rows_map=ready_rows_map,
                     mode="ready_only",
+                    product_type=product_type,
                 )
                 session.output_filename = gen_name
                 session.report = report

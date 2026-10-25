@@ -22,6 +22,8 @@ class AnalyzeResponse(BaseModel):
     filename: str
     summary: DetectionSummary
     designs: List[DetectedDesign]
+    product_type: str = "t_shirt"
+    sheet_name: str = "t_shirt"
 
 
 class SessionResponse(BaseModel):
@@ -38,6 +40,8 @@ class SessionResponse(BaseModel):
     design_product_links: Dict[str, Optional[str]]
     design_meta: Dict[str, Dict[str, str]] = Field(default_factory=dict)
     global_meta: Dict[str, str] = Field(default_factory=dict)
+    product_type: str = "t_shirt"
+    sheet_name: str = "t_shirt"
     download_url: Optional[str] = None
     output_filename: Optional[str] = None
     report: Optional[Dict[str, Any]] = None

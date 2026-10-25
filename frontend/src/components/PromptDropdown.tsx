@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@heroui/react";
 import { Check, FileText } from "lucide-react";
 import { toast } from "../ui/ToastProvider";
+import { useAppStore } from "../store";
 
 export const FLIPKART_TSHIRT_PROMPT = `You are an expert Flipkart catalog and apparel vision specialist. I am uploading a reference image showing a model wearing a T-shirt. Analyze the image with extreme visual precision and generate a 100% accurate, complete Flipkart listing JSON object.
 
@@ -131,16 +132,138 @@ JSON OUTPUT STRUCTURE (Return ONLY valid JSON, no markdown formatting, no commen
   "fabric_care": "Machine wash cold inside out, do not iron on print"
 }`;
 
+export const FLIPKART_SWEATSHIRT_PROMPT = `You are an expert Flipkart catalog and apparel vision specialist. I am uploading a reference image showing a model wearing a Sweatshirt or Hoodie. Analyze the image with extreme visual precision and generate a 100% accurate, complete Flipkart listing JSON object.
+
+CRITICAL EVALUATION GUIDELINES (EVALUATE THE REFERENCE MODEL IN THE PHOTO):
+
+1. TARGET GENDER & AUDIENCE (ideal_for):
+   - Look directly at the human model wearing the garment in the photo:
+     * If a male model (man / boy) is wearing the Sweatshirt: set "ideal_for": "Men". The product_title MUST start with "Men" or "Men's".
+     * If a female model (woman / girl) is wearing the Sweatshirt: set "ideal_for": "Women". The product_title MUST start with "Women" or "Women's".
+     * If both a male and female model appear together, or if it is explicitly a matching couple set: set "ideal_for": "Couple".
+     * Flat-lay / garment alone without any model: evaluate cut ("Men", "Women", or "Unisex").
+   - NEVER mark "Unisex" if a clear male or female model is wearing the garment. Always assign the model's actual gender.
+
+2. PATTERN & PRINT TYPE (pattern):
+   - Inspect the artwork on the sweatshirt with high precision:
+     * Graphic Print: Choose "Graphic Print" if there is ANY illustration, anime/manga art, cartoon/character, drawing, painting, skull, vehicle, animal, abstract visual artwork, or graphic image (even if accompanied by words or brand typography).
+     * Typography: Choose "Typography" ONLY if the garment has purely written text, words, quotes, slogans, or letters with NO visual drawings/graphics.
+     * Solid: Choose "Solid" if the garment is completely plain without any graphic, print, or text.
+     * Striped: Choose "Striped" for horizontal, vertical, or diagonal stripes across the body.
+     * Colorblock: Choose "Colorblock" for contrasting cut-and-sew geometric color panels.
+     * Tie & Dye: Choose "Tie & Dye" for tie-dye, acid wash, or dip-dye effects.
+
+3. HOOD & CLOSURE (hooded, closure, neck_type):
+   - hooded: "Yes" if the sweatshirt has an attached hood, otherwise "No".
+   - closure: "No Closure" (slip-on pullovers), "Zipper" (full or half zip), or "Button".
+   - neck_type:
+     * "Hooded Neck" (if hood is attached)
+     * "Crew Neck" / "Round Neck" (standard circular rib collar)
+     * "Collared Neck" (folded collar)
+     * "High Neck" (turtleneck / mock neck)
+
+4. SLEEVE & FIT (sleeve_type, fit_type):
+   - sleeve_type: Sweatshirts are almost always "Full Sleeve".
+   - fit_type: "Regular", "Oversized", "Slim", or "Boxy".
+
+5. COLOR MAPPING (color, brand_color):
+   - color: MUST map to one of Flipkart's official primary color categories:
+     Black | White | Beige | Blue | Dark Blue | Navy Blue | Light Blue | Brown | Dark Green | Green | Grey | Maroon | Orange | Pink | Purple | Red | Yellow | Multicolor.
+   - brand_color: The specific nuanced shade seen on the model (e.g. "Charcoal Black", "Heather Grey", "Olive Green", "Burgundy Maroon").
+
+6. MATERIAL & FABRIC (material):
+   - "Fleece", "Cotton Blend", "Cotton Fleece Blend", "Cotton Lycra Blend", or "Pure Cotton".
+
+7. PRODUCT TITLE FORMULA (product_title):
+   - Structure: [ideal_for] [fit_type (if Oversized)] [pattern] [neck_type] [sleeve_type] Sweatshirt
+   - Strict length: 35 to 65 characters, 5 to 8 words.
+   - Examples:
+     * "Men Graphic Printed Hooded Neck Full Sleeve Sweatshirt"
+     * "Women Oversized Solid Crew Neck Fleece Sweatshirt"
+     * "Men Regular Fit Typography Print Zipper Hoodie Sweatshirt"
+
+8. KEY FEATURES (key_features):
+   - Array of EXACTLY 10 strings formatted strictly as "Label: Value":
+     1. "Design: [Accurately describe artwork, e.g. Front High-Density Typography Graphic / Back Anime Artwork / Minimalist Tone]"
+     2. "Fit: [e.g. Relaxed Streetwear Oversized Fit / Standard Regular Comfort Fit]"
+     3. "Neck: [e.g. Drawstring Attached Hooded Neck / Ribbed Crew Neckline]"
+     4. "Sleeve: [e.g. Full Sleeves with Snug Ribbed Elastic Cuffs]"
+     5. "Fabric: [e.g. Heavyweight Brushed Fleece for Warmth and Softness]"
+     6. "Color: [Primary color and exact shade description]"
+     7. "Closure: [Slip-on Pullover Style / Front Full Zip Closure]"
+     8. "Gender: [Men / Women / Couple - strictly matching the model]"
+     9. "Occasion: [Casual Winter Wear, Evening Outings, College Wear]"
+     10. "Care Instructions: [Machine wash cold inside out with like colors, do not iron on print]"
+
+9. PRODUCT DESCRIPTION (product_description):
+   - Exactly 3 to 4 cohesive, engaging sentences (200 to 450 characters) summarizing winter warmth, cozy fleece fabric, ribbed hems, aesthetic graphic/print, and styling tips.
+
+10. STYLE CODE (style_code):
+    - Clean uppercase slug like: [GENDER]-SW-[FIT]-[COLOR]-[KEYWORD]-01 (e.g. "MEN-SW-OS-BLK-01").
+
+ALLOWED VALUES REFERENCE:
+- ideal_for: Men | Women | Couple | Baby Boys | Baby Girls | Boys | Girls
+- neck_type: Hooded Neck | Crew Neck | Round Neck | Collared Neck | High Neck | Asymmetric Neck
+- hooded: Yes | No
+- closure: No Closure | Zipper | Button
+- sleeve_type: Full Sleeve | Half Sleeve | Sleeveless
+- pattern: Graphic Print | Typography | Solid | Striped | Colorblock | Printed | Tie & Dye | Abstract
+- material: Fleece | Cotton Blend | Cotton Fleece Blend | Cotton Lycra Blend | Pure Cotton
+- detail_placement: Front | Chest | Full front | Back | All over | None
+
+JSON OUTPUT STRUCTURE (Return ONLY valid JSON, no markdown formatting, no commentary):
+{
+  "product_title": "",
+  "product_description": "",
+  "key_features": [
+    "Design: ...",
+    "Fit: ...",
+    "Neck: ...",
+    "Sleeve: ...",
+    "Fabric: ...",
+    "Color: ...",
+    "Closure: ...",
+    "Gender: ...",
+    "Occasion: ...",
+    "Care Instructions: ..."
+  ],
+  "material": "Fleece",
+  "pattern": "",
+  "sleeve_type": "Full Sleeve",
+  "neck_type": "",
+  "closure": "No Closure",
+  "hooded": "Yes",
+  "fit_type": "Regular",
+  "ideal_for": "",
+  "color": "",
+  "brand_color": "",
+  "occasion": "Casual",
+  "style_code": "",
+  "winter_type": "Heavy Winter",
+  "fabric_care": "Machine wash cold inside out, do not iron on print"
+}`;
+
+export function getPromptForProduct(productType?: string): string {
+  if (productType?.toLowerCase() === "sweatshirt") {
+    return FLIPKART_SWEATSHIRT_PROMPT;
+  }
+  return FLIPKART_TSHIRT_PROMPT;
+}
+
 export const PromptDropdown: React.FC = () => {
   const [copied, setCopied] = useState(false);
+  const session = useAppStore((s) => s.session);
+  const isSweatshirt = session?.product_type === "sweatshirt";
+  const activePrompt = isSweatshirt ? FLIPKART_SWEATSHIRT_PROMPT : FLIPKART_TSHIRT_PROMPT;
+  const label = isSweatshirt ? "Sweatshirt Prompt" : "T-Shirt Prompt";
 
   const copyToClipboard = async () => {
     try {
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(FLIPKART_TSHIRT_PROMPT);
+        await navigator.clipboard.writeText(activePrompt);
       } else {
         const textArea = document.createElement("textarea");
-        textArea.value = FLIPKART_TSHIRT_PROMPT;
+        textArea.value = activePrompt;
         textArea.style.position = "fixed";
         textArea.style.left = "-999999px";
         textArea.style.top = "-999999px";
@@ -151,7 +274,7 @@ export const PromptDropdown: React.FC = () => {
         textArea.remove();
       }
       setCopied(true);
-      toast.success("AI Prompt copied to clipboard!");
+      toast.success(`${isSweatshirt ? "Sweatshirt" : "T-Shirt"} Vision Prompt copied to clipboard!`);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy prompt:", err);
@@ -177,9 +300,9 @@ export const PromptDropdown: React.FC = () => {
           ? "bg-success/15 text-success border-success/30"
           : "text-foreground bg-content3 hover:bg-default-200"
       }`}
-      aria-label="Copy AI prompt template to clipboard"
+      aria-label={`Copy ${label} to clipboard`}
     >
-      {copied ? "Copied!" : "Prompt"}
+      {copied ? "Copied!" : label}
     </Button>
   );
 };

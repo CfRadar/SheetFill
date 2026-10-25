@@ -43,6 +43,8 @@ export interface SessionState {
   global_meta?: BrandMeta;
   download_url?: string | null;
   output_filename?: string | null;
+  product_type?: string;
+  sheet_name?: string;
   report?: any;
 }
 

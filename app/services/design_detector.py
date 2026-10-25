@@ -10,6 +10,27 @@ from app.services.sheet_reader import RawRow, RawSheet
 SIZE_REGEX = re.compile(r"^(.*)_(XXS|XS|S|M|L|XL|XXL|3XL|4XL|5XL|Free)$", re.IGNORECASE)
 IMAGE_COLS = ["AU", "AV", "AW", "AX", "AY", "AZ", "BA"]
 
+PRODUCT_CONFIGS: Dict[str, Dict[str, Any]] = {
+    "t_shirt": {
+        "image_cols": ["AU", "AV", "AW", "AX", "AY", "AZ", "BA"],
+        "palette_col": "BB",
+        "video_col": "BI",
+        "supplier_col": "BP",
+        "product_link_col": "D",
+        "desc_col": "BM",
+        "required_cols": ["K", "L", "BM"],
+    },
+    "sweatshirt": {
+        "image_cols": ["AX", "AY", "AZ", "BA", "BB"],
+        "palette_col": "BC",
+        "video_col": "BM",
+        "supplier_col": "CA",
+        "product_link_col": "D",
+        "desc_col": "BW",
+        "required_cols": ["K", "L", "BW"],
+    },
+}
+
 
 class DetectedDesign(BaseModel):
     """Represents a detected product design from the worksheet."""
@@ -120,6 +141,14 @@ def detect_designs(raw_sheet: RawSheet) -> DetectionResult:
     current_expanded_base: Optional[str] = None
     current_expanded_rows: List[Dict[str, Any]] = []
 
+    p_type = getattr(raw_sheet, "product_type", "t_shirt")
+    cfg = PRODUCT_CONFIGS.get(p_type, PRODUCT_CONFIGS["t_shirt"])
+    cfg_img_cols = cfg["image_cols"]
+    cfg_palette_col = cfg["palette_col"]
+    cfg_video_col = cfg["video_col"]
+    cfg_supplier_col = cfg["supplier_col"]
+    cfg_required_cols = cfg["required_cols"]
+
     def flush_expanded() -> None:
         nonlocal current_expanded_base, current_expanded_rows, design_counter
         if not current_expanded_rows:
@@ -129,25 +158,23 @@ def detect_designs(raw_sheet: RawSheet) -> DetectionResult:
         sheet_rows = [item["row"].row_index for item in current_expanded_rows]
         sizes = [item["size"] for item in current_expanded_rows if item["size"]]
 
-        # Check status: complete if every row has K, L, BM non-empty
+        # Check status: complete if every row has required columns non-empty
         missing_cols = set()
         for item in current_expanded_rows:
             r = item["row"]
-            if not _is_cell_filled(r.get("K")):
-                missing_cols.add("K")
-            if not _is_cell_filled(r.get("L")):
-                missing_cols.add("L")
-            if not _is_cell_filled(r.get("BM")):
-                missing_cols.add("BM")
+            for req_c in cfg_required_cols:
+                if not _is_cell_filled(r.get(req_c)):
+                    missing_cols.add(req_c)
 
         status = "complete" if not missing_cols else "partial"
 
-        # Image URLs AU..BA from first row (exact text, no trimming of URL body)
-        image_urls = [str(first_row.get(col)) if _is_cell_filled(first_row.get(col)) else None for col in IMAGE_COLS]
-        main_img = image_urls[0] if image_urls and image_urls[0] else None
-        palette_url = str(first_row.get("BB")) if _is_cell_filled(first_row.get("BB")) else None
-        video_url = str(first_row.get("BI")) if _is_cell_filled(first_row.get("BI")) else None
-        supplier_image = str(first_row.get("BP")) if _is_cell_filled(first_row.get("BP")) else None
+        # Image URLs from first row (padded to 7 slots)
+        raw_images = [str(first_row.get(col)) if _is_cell_filled(first_row.get(col)) else None for col in cfg_img_cols]
+        image_urls = (raw_images + [None] * 7)[:7]
+        main_img = next((img for img in image_urls if img), None)
+        palette_url = str(first_row.get(cfg_palette_col)) if _is_cell_filled(first_row.get(cfg_palette_col)) else None
+        video_url = str(first_row.get(cfg_video_col)) if _is_cell_filled(first_row.get(cfg_video_col)) else None
+        supplier_image = str(first_row.get(cfg_supplier_col)) if _is_cell_filled(first_row.get(cfg_supplier_col)) else None
         prod_link = str(first_row.get("D")) if _is_cell_filled(first_row.get("D")) else None
 
         # Existing values from first row (excluding G)
@@ -206,12 +233,13 @@ def detect_designs(raw_sheet: RawSheet) -> DetectionResult:
             if base:
                 seen_bases.add(base)
 
-            # Image URLs AU..BA from stub row (exact text, no trimming of URL body)
-            image_urls = [str(row.get(col)) if _is_cell_filled(row.get(col)) else None for col in IMAGE_COLS]
-            main_img = image_urls[0] if image_urls and image_urls[0] else None
-            palette_url = str(row.get("BB")) if _is_cell_filled(row.get("BB")) else None
-            video_url = str(row.get("BI")) if _is_cell_filled(row.get("BI")) else None
-            supplier_image = str(row.get("BP")) if _is_cell_filled(row.get("BP")) else None
+            # Image URLs from stub row (padded to 7 slots)
+            raw_images = [str(row.get(col)) if _is_cell_filled(row.get(col)) else None for col in cfg_img_cols]
+            image_urls = (raw_images + [None] * 7)[:7]
+            main_img = next((img for img in image_urls if img), None)
+            palette_url = str(row.get(cfg_palette_col)) if _is_cell_filled(row.get(cfg_palette_col)) else None
+            video_url = str(row.get(cfg_video_col)) if _is_cell_filled(row.get(cfg_video_col)) else None
+            supplier_image = str(row.get(cfg_supplier_col)) if _is_cell_filled(row.get(cfg_supplier_col)) else None
             prod_link = str(row.get("D")) if _is_cell_filled(row.get("D")) else None
 
             existing_vals = {}
@@ -234,7 +262,7 @@ def detect_designs(raw_sheet: RawSheet) -> DetectionResult:
                 product_link=prod_link,
                 is_manual_slot=False,
                 existing_values=existing_vals,
-                missing_required=["K", "L", "BM"],
+                missing_required=sorted(list(cfg_required_cols)),
                 warnings=[],
             ))
             design_counter += 1

@@ -29,6 +29,8 @@ class SessionState(BaseModel):
     design_meta: Dict[str, Dict[str, str]] = Field(default_factory=dict)  # did -> {"brand": ..., "manufacturer": ..., "hsn": ...}
     global_meta: Dict[str, str] = Field(default_factory=dict)  # {"brand": ..., "manufacturer": ..., "hsn": ...}
     user_id: Optional[str] = None
+    sheet_name: str = "t_shirt"
+    product_type: str = "t_shirt"
     output_filename: Optional[str] = None
     report: Optional[Dict[str, Any]] = None
 
@@ -69,6 +71,8 @@ class DesignStore:
         file_bytes: bytes,
         detection_result: DetectionResult,
         user_id: Optional[str] = None,
+        sheet_name: str = "t_shirt",
+        product_type: str = "t_shirt",
     ) -> SessionState:
         """Initializes a new session folder and saves the uploaded file scoped to user_id."""
         sid = str(uuid.uuid4())
@@ -88,6 +92,8 @@ class DesignStore:
             original_filename=filename,
             created_at=now,
             updated_at=now,
+            sheet_name=sheet_name,
+            product_type=product_type,
             summary=detection_result.summary,
             designs=detection_result.designs,
         )

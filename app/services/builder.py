@@ -17,6 +17,7 @@ from flipkart_filler.text_builders import (
 )
 
 IMAGE_COLS = ["AU", "AV", "AW", "AX", "AY", "AZ", "BA"]
+SWEAT_IMAGE_COLS = ["AX", "AY", "AZ", "BA", "BB"]
 
 # Flipkart official 19 Matching Attributes (must be 100% identical for all rows in a Group ID)
 MATCHING_ATTRIBUTE_COLS = [
@@ -41,12 +42,45 @@ MATCHING_ATTRIBUTE_COLS = [
     "AL",  # Sleeve
 ]
 
+SWEAT_MATCHING_ATTRIBUTE_COLS = [
+    "AQ",  # Neck
+    "BI",  # Model Name
+    "BN",  # Domestic Warranty
+    "BJ",  # Occasion
+    "BM",  # Video URL
+    "BS",  # Sleeve Details
+    "AO",  # Hooded
+    "BR",  # Surface Styling
+    "BP",  # Warranty Summary
+    "AP",  # Closure
+    "BF",  # Pattern/Print Type
+    "AK",  # Reversible
+    "BD",  # Character
+    "AG",  # Brand
+    "BE",  # Knit Type
+    "BK",  # Pockets
+    "AN",  # Fabric Care
+    "BQ",  # Sport Type
+    "AR",  # Suitable For
+    "AH",  # Pack of
+    "BT",  # Winter Type
+    "AI",  # Fabric
+    "AJ",  # Pattern
+    "BG",  # Detail Placement
+    "AM",  # Ideal For
+    "AL",  # Sleeve
+    "BL",  # Items Included
+]
 
-def get_default_mapper(template_path: Optional[str] = None) -> ValueMapper:
+
+def get_default_mapper(template_path: Optional[str] = None, product_type: str = "t_shirt") -> ValueMapper:
     """Creates a configured ValueMapper using default config paths and the master template."""
     base_dir = Path(__file__).resolve().parent.parent.parent
     if not template_path:
-        template_path = str(base_dir / "templates" / "Flipkart_TShirt_Template.xlsm")
+        if product_type == "sweatshirt":
+            template_path = str(base_dir / "templates" / "Flipkart_Sweatshirt_Template.xls")
+        else:
+            template_path = str(base_dir / "templates" / "Flipkart_TShirt_Template.xlsm")
     mappings_path = str(base_dir / "config" / "mappings.yaml")
     defaults_path = str(base_dir / "config" / "defaults.yaml")
     allowed = load_allowed_values(template_path)
@@ -74,6 +108,7 @@ def build_design_rows(
     existing_urls_by_design: Optional[Dict[str, str]] = None,
     meta_override: Optional[Dict[str, str]] = None,
     design_index: Optional[int] = None,
+    product_type: str = "t_shirt",
 ) -> BuildResult:
     """Builds size rows for a single design adhering strictly to Section 5 rules."""
     errors: List[ValidationIssue] = []
@@ -216,11 +251,12 @@ def build_design_rows(
             )
         )
 
-    final_images: List[Optional[str]] = [None] * 7
-    stub_images = design.image_urls or [None] * 7
+    cur_img_cols = SWEAT_IMAGE_COLS if product_type == "sweatshirt" else IMAGE_COLS
+    final_images: List[Optional[str]] = [None] * len(cur_img_cols)
+    stub_images = design.image_urls or [None] * len(cur_img_cols)
 
-    for i in range(7):
-        col = IMAGE_COLS[i]
+    for i in range(len(cur_img_cols)):
+        col = cur_img_cols[i]
         ui_val = image_edits[i] if (image_edits and i < len(image_edits)) else None
         stub_val = stub_images[i] if i < len(stub_images) else None
 
@@ -247,8 +283,8 @@ def build_design_rows(
                 warnings.append(
                     ValidationIssue(
                         level="WARNING",
-                        field=IMAGE_COLS[i],
-                        message=f"Image URL in slot {IMAGE_COLS[i]} does not start with 'https://': {url}",
+                        field=cur_img_cols[i],
+                        message=f"Image URL in slot {cur_img_cols[i]} does not start with 'https://': {url}",
                     )
                 )
 
@@ -351,16 +387,21 @@ def build_design_rows(
         )
 
     # Map fit
-    fit_input = json_data.get("fit_type") or design.existing_values.get("AO") or "Regular"
-    mapped_fit, fit_issue = mapper.map_attribute("fit", fit_input)
-    if fit_issue:
-        if fit_issue.level == "ERROR":
-            errors.append(fit_issue)
-        else:
-            warnings.append(fit_issue)
+    if product_type == "sweatshirt":
+        fit_input = json_data.get("fit_type") or "Regular"
+        mapped_fit = fit_input
+    else:
+        fit_input = json_data.get("fit_type") or design.existing_values.get("AO") or "Regular"
+        mapped_fit, fit_issue = mapper.map_attribute("fit", fit_input)
+        if fit_issue:
+            if fit_issue.level == "ERROR":
+                errors.append(fit_issue)
+            else:
+                warnings.append(fit_issue)
 
     # Map color
-    color_input = json_data.get("color") or design.existing_values.get("AS") or "Black"
+    color_col = "AV" if product_type == "sweatshirt" else "AS"
+    color_input = json_data.get("color") or design.existing_values.get(color_col) or "Black"
     mapped_color, color_issue = mapper.map_attribute("color", color_input, allow_multi=True)
     if color_issue:
         if color_issue.level == "ERROR":
@@ -608,81 +649,156 @@ def build_design_rows(
     for size in sizes:
         sku = f"{sku_base}_{size}"
 
-        cells: Dict[str, Any] = {
-            "G": sku,
-            "H": group_id_val,
-            "J": str(design.existing_values.get("J", defaults.get("listing_status", "Active"))),
-            "K": mrp_val,
-            "L": sp_val,
-            "M": str(design.existing_values.get("M", defaults.get("fulfilment_by", "Seller"))),
-            "N": str(design.existing_values.get("N", defaults.get("procurement_type", "instock"))),
-            "O": int(design.existing_values.get("O", defaults.get("procurement_sla_days", 2))),
-            "P": int(design.existing_values.get("P", defaults.get("stock", 2000))),
-            "Q": str(design.existing_values.get("Q", defaults.get("shipping_provider", "Flipkart"))),
-            "R": float(design.existing_values.get("R", handling.get("local", 0))),
-            "S": float(design.existing_values.get("S", handling.get("zonal", 0))),
-            "T": float(design.existing_values.get("T", handling.get("national", 0))),
-            "U": float(design.existing_values.get("U", pkg.get("length", 25))),
-            "V": float(design.existing_values.get("V", pkg.get("breadth", 20))),
-            "W": float(design.existing_values.get("W", pkg.get("height", 3))),
-            "X": float(design.existing_values.get("X", defaults.get("weight_kg", 0.222))),
-            "Y": hsn_val,
-            "Z": float(design.existing_values.get("Z", defaults.get("luxury_cess", 0))),
-            "AA": str(design.existing_values.get("AA", defaults.get("country_of_origin", "India"))),
-            "AB": manufacturer_val,
-            "AC": packer_val,
-            "AE": str(design.existing_values.get("AE", defaults.get("tax_code", "GST_APPAREL"))),
-            "AG": brand_val,
-            "AH": mapped_neck,
-            "AI": mapped_pattern,
-            "AJ": mapped_fabric,
-            "AK": mapped_ideal,
-            "AL": mapped_sleeve,
-            "AM": mapped_occ,
-            "AN": int(design.existing_values.get("AN", defaults.get("pack_of", 1))),
-            "AO": mapped_fit,
-            "AP": str(design.existing_values.get("AP", defaults.get("suitable_for", "Western Wear"))),
-            "AQ": style_code_val,
-            "AR": size,
-            "AS": mapped_color,
-            "AT": brand_color_val,
-            "BE": str(print_coverage_val),
-            "BF": str(tee_length_val),
-            "BG": str(design.existing_values.get("BG", defaults.get("reversible", "No"))),
-            "BH": fabric_care_str,
-            "BJ": str(surface_styling_val),
-            "BK": str(sleeve_details_val),
-            "BM": desc_val,
-            "BN": search_keywords_str,
-            "BO": key_features_str,
-        }
+        if product_type == "sweatshirt":
+            cells: Dict[str, Any] = {
+                "G": sku,
+                "H": group_id_val,
+                "J": str(design.existing_values.get("J", defaults.get("listing_status", "Active"))),
+                "K": mrp_val,
+                "L": sp_val,
+                "M": str(design.existing_values.get("M", defaults.get("fulfilment_by", "Seller"))),
+                "N": str(design.existing_values.get("N", defaults.get("procurement_type", "instock"))),
+                "O": int(design.existing_values.get("O", defaults.get("procurement_sla_days", 2))),
+                "P": int(design.existing_values.get("P", defaults.get("stock", 2000))),
+                "Q": str(design.existing_values.get("Q", defaults.get("shipping_provider", "Flipkart"))),
+                "R": float(design.existing_values.get("R", handling.get("local", 0))),
+                "S": float(design.existing_values.get("S", handling.get("zonal", 0))),
+                "T": float(design.existing_values.get("T", handling.get("national", 0))),
+                "U": float(design.existing_values.get("U", pkg.get("length", 30))),
+                "V": float(design.existing_values.get("V", pkg.get("breadth", 25))),
+                "W": float(design.existing_values.get("W", pkg.get("height", 4))),
+                "X": float(design.existing_values.get("X", defaults.get("weight_kg", 0.45))),
+                "Y": hsn_val,
+                "Z": float(design.existing_values.get("Z", defaults.get("luxury_cess", 0))),
+                "AA": str(design.existing_values.get("AA", defaults.get("country_of_origin", "India"))),
+                "AB": manufacturer_val,
+                "AC": packer_val,
+                "AE": str(design.existing_values.get("AE", defaults.get("tax_code", "GST_APPAREL"))),
+                "AG": brand_val,
+                "AH": int(design.existing_values.get("AH", defaults.get("pack_of", 1))),
+                "AI": mapped_fabric,
+                "AJ": mapped_pattern,
+                "AK": str(design.existing_values.get("AK", defaults.get("reversible", "No"))),
+                "AL": mapped_sleeve,
+                "AM": mapped_ideal,
+                "AN": fabric_care_str,
+                "AO": str(json_data.get("hooded") or design.existing_values.get("AO") or defaults.get("hooded", "No")),
+                "AP": str(json_data.get("closure") or design.existing_values.get("AP") or defaults.get("closure", "No Closure")),
+                "AQ": mapped_neck,
+                "AR": str(design.existing_values.get("AR", defaults.get("suitable_for", "Western Wear"))),
+                "AS": size,
+                "AT": str(design.existing_values.get("AT", "")),
+                "AU": style_code_val,
+                "AV": mapped_color,
+                "AW": brand_color_val,
+                "BD": str(design.existing_values.get("BD", defaults.get("character", "None"))),
+                "BE": str(design.existing_values.get("BE", "")),
+                "BF": str(json_data.get("pattern_print_type") or design.existing_values.get("BF") or mapped_pattern),
+                "BG": dp_val or str(design.existing_values.get("BG", "Front")),
+                "BH": str(design.existing_values.get("BH", "")),
+                "BI": str(design.existing_values.get("BI", "")),
+                "BJ": mapped_occ,
+                "BK": str(design.existing_values.get("BK", "")),
+                "BL": str(design.existing_values.get("BL", defaults.get("items_included", "1 Sweatshirt"))),
+                "BM": str(final_video_url) if final_video_url else str(design.existing_values.get("BM", "")),
+                "BQ": str(design.existing_values.get("BQ", "")),
+                "BR": str(surface_styling_val),
+                "BS": str(design.existing_values.get("BS", defaults.get("sleeve_details", "Cuffed"))),
+                "BT": str(design.existing_values.get("BT", defaults.get("winter_type", "Heavy Winter"))),
+                "BW": desc_val,
+                "BX": search_keywords_str,
+                "BY": key_features_str,
+                "CA": str(final_supplier_image) if final_supplier_image else str(design.existing_values.get("CA", "")),
+                "D": final_product_link or str(design.existing_values.get("D", "")),
+            }
+            if final_palette_url:
+                cells["BC"] = str(final_palette_url)
 
-        if dp_val:
-            cells["BD"] = dp_val
+            for img_idx, col in enumerate(cur_img_cols):
+                if img_idx < len(final_images) and final_images[img_idx]:
+                    cells[col] = str(final_images[img_idx])
 
-        if final_product_link:
-            cells["D"] = final_product_link
+        else:
+            cells: Dict[str, Any] = {
+                "G": sku,
+                "H": group_id_val,
+                "J": str(design.existing_values.get("J", defaults.get("listing_status", "Active"))),
+                "K": mrp_val,
+                "L": sp_val,
+                "M": str(design.existing_values.get("M", defaults.get("fulfilment_by", "Seller"))),
+                "N": str(design.existing_values.get("N", defaults.get("procurement_type", "instock"))),
+                "O": int(design.existing_values.get("O", defaults.get("procurement_sla_days", 2))),
+                "P": int(design.existing_values.get("P", defaults.get("stock", 2000))),
+                "Q": str(design.existing_values.get("Q", defaults.get("shipping_provider", "Flipkart"))),
+                "R": float(design.existing_values.get("R", handling.get("local", 0))),
+                "S": float(design.existing_values.get("S", handling.get("zonal", 0))),
+                "T": float(design.existing_values.get("T", handling.get("national", 0))),
+                "U": float(design.existing_values.get("U", pkg.get("length", 25))),
+                "V": float(design.existing_values.get("V", pkg.get("breadth", 20))),
+                "W": float(design.existing_values.get("W", pkg.get("height", 3))),
+                "X": float(design.existing_values.get("X", defaults.get("weight_kg", 0.222))),
+                "Y": hsn_val,
+                "Z": float(design.existing_values.get("Z", defaults.get("luxury_cess", 0))),
+                "AA": str(design.existing_values.get("AA", defaults.get("country_of_origin", "India"))),
+                "AB": manufacturer_val,
+                "AC": packer_val,
+                "AE": str(design.existing_values.get("AE", defaults.get("tax_code", "GST_APPAREL"))),
+                "AG": brand_val,
+                "AH": mapped_neck,
+                "AI": mapped_pattern,
+                "AJ": mapped_fabric,
+                "AK": mapped_ideal,
+                "AL": mapped_sleeve,
+                "AM": mapped_occ,
+                "AN": int(design.existing_values.get("AN", defaults.get("pack_of", 1))),
+                "AO": mapped_fit,
+                "AP": str(design.existing_values.get("AP", defaults.get("suitable_for", "Western Wear"))),
+                "AQ": style_code_val,
+                "AR": size,
+                "AS": mapped_color,
+                "AT": brand_color_val,
+                "BE": str(print_coverage_val),
+                "BF": str(tee_length_val),
+                "BG": str(design.existing_values.get("BG", defaults.get("reversible", "No"))),
+                "BH": fabric_care_str,
+                "BJ": str(surface_styling_val),
+                "BK": str(sleeve_details_val),
+                "BM": desc_val,
+                "BN": search_keywords_str,
+                "BO": key_features_str,
+            }
 
-        if final_palette_url:
-            cells["BB"] = str(final_palette_url)
+            if dp_val:
+                cells["BD"] = dp_val
 
-        if final_video_url:
-            cells["BI"] = str(final_video_url)
+            if final_product_link:
+                cells["D"] = final_product_link
 
-        if final_supplier_image:
-            cells["BP"] = str(final_supplier_image)
+            if final_palette_url:
+                cells["BB"] = str(final_palette_url)
 
-        for img_idx, col in enumerate(IMAGE_COLS):
-            if img_idx < len(final_images) and final_images[img_idx]:
-                cells[col] = final_images[img_idx]
+            if final_video_url:
+                cells["BI"] = str(final_video_url)
+
+            if final_supplier_image:
+                cells["BP"] = str(final_supplier_image)
+
+            for img_idx, col in enumerate(IMAGE_COLS):
+                if img_idx < len(final_images) and final_images[img_idx]:
+                    cells[col] = final_images[img_idx]
 
         rows.append(RowRecord(size=size, sku=sku, cells=cells))
 
     # Intra-Group Consistency Guard:
-    # Ensure all 19 Flipkart Matching Attributes are 100% identical across all rows of this design group
+    # Ensure all Flipkart Matching Attributes are 100% identical across all rows of this design group
+    cur_matching_cols = (
+        SWEAT_MATCHING_ATTRIBUTE_COLS
+        if product_type == "sweatshirt"
+        else MATCHING_ATTRIBUTE_COLS
+    )
     if rows:
         parent_cells = rows[0].cells
-        for col_code in MATCHING_ATTRIBUTE_COLS:
+        for col_code in cur_matching_cols:
             if col_code in parent_cells and parent_cells[col_code] is not None:
                 p_val = parent_cells[col_code]
                 for r in rows[1:]:

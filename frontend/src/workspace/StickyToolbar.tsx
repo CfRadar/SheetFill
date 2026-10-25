@@ -33,7 +33,7 @@ import {
 import { addSlots, generateWorkbook, getSession, downloadWorkbookFile } from "../api";
 import { useAppStore } from "../store";
 import { toast } from "../ui/ToastProvider";
-import { FLIPKART_TSHIRT_PROMPT } from "../components/PromptDropdown";
+import { getPromptForProduct } from "../components/PromptDropdown";
 
 interface StickyToolbarProps {
   onOpenBulkPaste: () => void;
@@ -100,8 +100,10 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
 
   const handleCopyPrompt = async () => {
     try {
-      await navigator.clipboard.writeText(FLIPKART_TSHIRT_PROMPT);
-      toast.success("ChatGPT Vision Prompt copied to clipboard!");
+      const isSweat = session?.product_type === "sweatshirt";
+      const prompt = getPromptForProduct(session?.product_type);
+      await navigator.clipboard.writeText(prompt);
+      toast.success(`${isSweat ? "Sweatshirt" : "T-Shirt"} Vision Prompt copied to clipboard!`);
     } catch {
       toast.error("Failed to copy prompt.");
     }
@@ -417,7 +419,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
           {(onClose) => (
             <>
               <ModalHeader className="text-base font-bold border-b border-divider py-3.5 px-6 flex items-center justify-between">
-                <span>Flipkart ChatGPT Vision Prompt</span>
+                <span>{session?.product_type === "sweatshirt" ? "Flipkart Sweatshirt Vision Prompt" : "Flipkart T-Shirt Vision Prompt"}</span>
                 <Button
                   size="sm"
                   color="primary"
@@ -430,7 +432,7 @@ export const StickyToolbar: React.FC<StickyToolbarProps> = ({
               </ModalHeader>
               <ModalBody className="p-6">
                 <pre className="text-xs font-mono bg-content2/60 p-4 rounded-xl border border-divider/60 whitespace-pre-wrap leading-relaxed select-text text-foreground">
-                  {FLIPKART_TSHIRT_PROMPT}
+                  {getPromptForProduct(session?.product_type)}
                 </pre>
               </ModalBody>
               <ModalFooter className="border-t border-divider py-3 px-6">
