@@ -27,6 +27,10 @@ class ProductInput(BaseModel):
     occasion: Optional[str] = None
     brand_color: Optional[str] = None
     fabric_care: Optional[str] = None
+    surface_styling: Optional[str] = None
+    size_measuring_unit: Optional[str] = None
+
+    model_config = {"extra": "allow"}
 
 
 class RowRecord(BaseModel):

@@ -52,3 +52,36 @@ def test_moonlight_row_generation(mapper):
         assert r.get("K") == 1999
         assert r.get("L") == 749
         assert r.get("Y") in ("610910", "61091000")
+
+
+def test_sweatshirt_row_generation():
+    sweat_template = ROOT_DIR / "templates" / "Flipkart_Sweatshirt_Template.xls"
+    allowed_dict = load_allowed_values(sweat_template)
+    mapper_sweat = ValueMapper(
+        mappings_path=CONFIG_DIR / "mappings.yaml",
+        defaults_path=CONFIG_DIR / "defaults.yaml",
+        allowed_values=allowed_dict,
+    )
+    products = load_products_from_path(FIXTURES_DIR / "moonlight.json")
+    moonlight = products[0]
+
+    existing_skus = set()
+    rows, issues = build_product_rows(
+        moonlight,
+        mapper_sweat,
+        existing_skus,
+        product_type="sweatshirt",
+    )
+
+    errors = [i for i in issues if i.level == "ERROR"]
+    assert len(errors) == 0
+    assert len(rows) == 4
+
+    sizes = ["S", "M", "L", "XL"]
+    for idx, r in enumerate(rows):
+        expected_size = sizes[idx]
+        assert r.size == expected_size
+        assert r.get("AS") == expected_size  # Col AS = Brand Size
+        assert r.get("AT") == "Regular"      # Col AT = Brand Size - Measuring Unit
+        assert r.get("BR") == "None"         # Col BR = Surface Styling (None, valid in sweatshirt)
+

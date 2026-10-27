@@ -87,6 +87,30 @@ def get_default_mapper(template_path: Optional[str] = None, product_type: str = 
     return ValueMapper(mappings_path=mappings_path, defaults_path=defaults_path, allowed_values=allowed)
 
 
+def get_size_measuring_unit(size_val: str, ideal_for_val: str, user_unit: Optional[str] = None) -> str:
+    """Computes the Flipkart size measuring unit (qualifier) for sweatshirt Column AT.
+    Rules:
+    - If explicit qualifier is given (and not just empty brackets/string), use it.
+    - If size is purely numeric (e.g. 32, 34, 36), qualifier is 'Number'.
+    - If Ideal For is baby/kids (Baby Boys, Baby Girls, Boys, Girls), qualifier is 'Kids'.
+    - Otherwise (Men, Women, Couple, etc.) for alpha sizes (S, M, L, XL, etc.), qualifier is 'Regular'.
+    """
+    if user_unit and str(user_unit).strip():
+        cleaned = str(user_unit).strip().strip("[]").strip()
+        if cleaned:
+            return cleaned
+
+    s = str(size_val).strip()
+    if s.isdigit():
+        return "Number"
+
+    ideal_lower = str(ideal_for_val).strip().lower()
+    if any(k in ideal_lower for k in ["baby", "boy", "girl", "kid"]):
+        return "Kids"
+
+    return "Regular"
+
+
 class BuildResult(BaseModel):
     """Result of building preview rows for a design."""
 
@@ -517,11 +541,41 @@ def build_design_rows(
         dp_val = None
 
     # Stylings and details from JSON or existing stub
-    surface_styling_val = (
+    allowed_surface = mapper.allowed_values.get("surface styling", [])
+    if not allowed_surface:
+        if product_type == "sweatshirt":
+            allowed_surface = [
+                "Applique", "Bow", "Braids", "Button Flap Pocket", "Crochets & Schiffily",
+                "Cut-Outs", "Fringed", "Knots", "Laces", "None", "Pockets", "Ruffled",
+                "Sequined", "Tie-Ups"
+            ]
+        else:
+            allowed_surface = [
+                "Applique", "Beads & Stones", "Bow", "Braids", "Brand Logo", "Buttons",
+                "Crochets & Schiffily", "Cut-Outs", "Cut-work", "Epaulettes", "Eyelets",
+                "Fringed", "Knots", "Laces", "Mesh", "Metal Embellishment", "None",
+                "Patch Work", "Pearl", "Perforation", "Piping Details", "Pocket Flap",
+                "Pockets", "Pompom", "Ruffled", "Sequins", "Shimmer", "Side Stripe",
+                "Statement Logo", "Tassels", "Thread Work", "Tie-Ups", "Twill Tape",
+                "Typography", "Zipper Details"
+            ]
+
+    raw_surface = (
         json_data.get("surface_styling")
-        or design.existing_values.get("BJ")
-        or ("Typography" if "typography" in desc_val.lower() else "None")
+        or (design.existing_values.get("BR") if product_type == "sweatshirt" else design.existing_values.get("BJ"))
     )
+    if raw_surface:
+        raw_surface_str = str(raw_surface).strip()
+        matched_surface = next((v for v in allowed_surface if v.lower() == raw_surface_str.lower()), None)
+        surface_styling_val = matched_surface or "None"
+    else:
+        if product_type == "sweatshirt":
+            surface_styling_val = "None"
+        else:
+            if "typography" in desc_val.lower() and any(v.lower() == "typography" for v in allowed_surface):
+                surface_styling_val = "Typography"
+            else:
+                surface_styling_val = "None"
     print_coverage_val = json_data.get("print_coverage") or design.existing_values.get("BE") or defaults.get("print_coverage", "Chest")
     tee_length_val = json_data.get("tee_length") or design.existing_values.get("BF") or defaults.get("tee_length", "Medium")
     sleeve_details_val = json_data.get("sleeve_details") or design.existing_values.get("BK") or defaults.get("sleeve_details", "No Details")
@@ -687,7 +741,11 @@ def build_design_rows(
                 "AQ": mapped_neck,
                 "AR": str(design.existing_values.get("AR", defaults.get("suitable_for", "Western Wear"))),
                 "AS": size,
-                "AT": str(design.existing_values.get("AT", "")),
+                "AT": get_size_measuring_unit(
+                    size,
+                    mapped_ideal,
+                    str(json_data.get("size_measuring_unit") or json_data.get("measuring_unit") or design.existing_values.get("AT", "")),
+                ),
                 "AU": style_code_val,
                 "AV": mapped_color,
                 "AW": brand_color_val,

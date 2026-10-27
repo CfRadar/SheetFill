@@ -34,6 +34,30 @@ def determine_sku_base(product: ProductInput, source_sheet_data: Optional[Dict[s
     return prefix
 
 
+def get_size_measuring_unit(size_val: str, ideal_for_val: str, user_unit: Optional[str] = None) -> str:
+    """Computes the Flipkart size measuring unit (qualifier) for sweatshirt Column AT.
+    Rules:
+    - If explicit qualifier is given (and not just empty brackets/string), use it.
+    - If size is purely numeric (e.g. 32, 34, 36), qualifier is 'Number'.
+    - If Ideal For is baby/kids (Baby Boys, Baby Girls, Boys, Girls), qualifier is 'Kids'.
+    - Otherwise (Men, Women, Couple, etc.) for alpha sizes (S, M, L, XL, etc.), qualifier is 'Regular'.
+    """
+    if user_unit and str(user_unit).strip():
+        cleaned = str(user_unit).strip().strip("[]").strip()
+        if cleaned:
+            return cleaned
+
+    s = str(size_val).strip()
+    if s.isdigit():
+        return "Number"
+
+    ideal_lower = str(ideal_for_val).strip().lower()
+    if any(k in ideal_lower for k in ["baby", "boy", "girl", "kid"]):
+        return "Kids"
+
+    return "Regular"
+
+
 def build_product_rows(
     product: ProductInput,
     mapper: ValueMapper,
@@ -116,10 +140,42 @@ def build_product_rows(
     full_text = (
         product.product_description + " " + " ".join(product.key_features) + " " + product.pattern
     ).lower()
-    if any(k in full_text for k in ["typography", "lettering", "text print", "slogan"]):
-        surface_styling = "Typography"
+
+    allowed_surface = mapper.allowed_values.get("surface styling", [])
+    if not allowed_surface:
+        if product_type == "sweatshirt":
+            allowed_surface = [
+                "Applique", "Bow", "Braids", "Button Flap Pocket", "Crochets & Schiffily",
+                "Cut-Outs", "Fringed", "Knots", "Laces", "None", "Pockets", "Ruffled",
+                "Sequined", "Tie-Ups"
+            ]
+        else:
+            allowed_surface = [
+                "Applique", "Beads & Stones", "Bow", "Braids", "Brand Logo", "Buttons",
+                "Crochets & Schiffily", "Cut-Outs", "Cut-work", "Epaulettes", "Eyelets",
+                "Fringed", "Knots", "Laces", "Mesh", "Metal Embellishment", "None",
+                "Patch Work", "Pearl", "Perforation", "Piping Details", "Pocket Flap",
+                "Pockets", "Pompom", "Ruffled", "Sequins", "Shimmer", "Side Stripe",
+                "Statement Logo", "Tassels", "Thread Work", "Tie-Ups", "Twill Tape",
+                "Typography", "Zipper Details"
+            ]
+
+    raw_surface = getattr(product, "surface_styling", None)
+    if not raw_surface and source_sheet_data:
+        raw_surface = source_sheet_data.get("BR") if product_type == "sweatshirt" else source_sheet_data.get("BJ")
+
+    if raw_surface:
+        raw_surface_str = str(raw_surface).strip()
+        matched_surface = next((v for v in allowed_surface if v.lower() == raw_surface_str.lower()), None)
+        surface_styling = matched_surface or "None"
     else:
-        surface_styling = "None"
+        if product_type == "sweatshirt":
+            surface_styling = "None"
+        else:
+            if any(k in full_text for k in ["typography", "lettering", "text print", "slogan"]) and any(v.lower() == "typography" for v in allowed_surface):
+                surface_styling = "Typography"
+            else:
+                surface_styling = "None"
 
     # 4. Check images & source sheet images
     if product.images:
@@ -276,7 +332,11 @@ def build_product_rows(
                 "AQ": mapped_neck,
                 "AR": str(defaults.get("suitable_for", "Western Wear")),
                 "AS": size,
-                "AT": "",
+                "AT": get_size_measuring_unit(
+                    size,
+                    mapped_ideal_for,
+                    getattr(product, "size_measuring_unit", None) or (source_sheet_data.get("AT") if source_sheet_data else ""),
+                ),
                 "AU": str(product.style_code or "").strip() or sku_base,
                 "AV": mapped_color,
                 "AW": brand_color_val,
